@@ -65,6 +65,23 @@ export default function PriceCalculator() {
     }
   };
 
+  const handleSave = async () => {
+    if (!result) return;
+    setStatus('saving');
+    try {
+      const baseItems = items.filter((item) => item.name.trim() && item.cost > 0);
+      const validItems = includeDigitalWebsite
+        ? [...baseItems, { id: 'digital-website', name: `Digital website (${digitalWebsiteTier})`, cost: DIGITAL_WEBSITE_PRICES[digitalWebsiteTier] }]
+        : baseItems;
+      await saveQuote(validItems, result);
+      setStatus('saved');
+      setTimeout(() => setStatus('idle'), 2000);
+    } catch {
+      setErrorMsg('Could not save the quote.');
+      setStatus('error');
+    }
+  };
+
   const handleJapanCalculate = () => {
     if (giftCostYen <= 0) {
       setJapanErrorMsg('Enter a gift cost above 0.');
