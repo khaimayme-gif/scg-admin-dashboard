@@ -14,7 +14,7 @@ const MODULES = [
   { id: 'delivery', label: 'Delivery Schedule', ready: false },
   { id: 'expenses', label: 'Expense Tracker', ready: false },
   { id: 'profit', label: 'Monthly Profit', ready: false },
-  { id: 'settings', label: 'Settings', ready: false },
+  { id: 'settings', label: 'Settings', ready: true },
 ];
 
 export default function Sidebar({ active, onSelect, onLogout }: SidebarProps) {

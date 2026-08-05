@@ -5,3 +5,4 @@ dist/
 .vercel
 .DS_Store
 backend/scg.db
+.env*

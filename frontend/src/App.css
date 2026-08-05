@@ -451,3 +451,7 @@ html, body, #root {
 .login-brand { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; color: var(--forest-deep); text-align: center; margin-bottom: 6px; }
 .sidebar-logout { margin-top: auto; background: none; border: 1px solid rgba(251, 249, 245, 0.25); color: var(--ivory); opacity: 0.7; font-family: inherit; font-size: 13px; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
 .sidebar-logout:hover { opacity: 1; background: rgba(251, 249, 245, 0.08); }
+
+.currency-equivalents { margin: 4px 0 8px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.currency-equivalents .field-hint { margin: 0 0 4px; }
+.currency-equivalents .ledger-row { font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 4px 0; }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { calculatePrice, saveQuote, type PriceItem, type CalculationResult } from './api';
 
 let nextId = 1;
@@ -21,6 +21,29 @@ export default function PriceCalculator() {
   const [japanTotal, setJapanTotal] = useState<number | null>(null);
   const [japanStatus, setJapanStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [japanErrorMsg, setJapanErrorMsg] = useState('');
+
+  const [rates, setRates] = useState<{ rateThbToJpy: number; rateThbToMmk: number; rateMmkToJpy: number } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/settings', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.rateThbToJpy && data.rateThbToMmk && data.rateMmkToJpy) {
+          setRates({ rateThbToJpy: data.rateThbToJpy, rateThbToMmk: data.rateThbToMmk, rateMmkToJpy: data.rateMmkToJpy });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const convertFromThb = (thb: number) => {
+    if (!rates) return null;
+    return { jpy: thb * rates.rateThbToJpy, mmk: thb * rates.rateThbToMmk };
+  };
+
+  const convertFromJpy = (jpy: number) => {
+    if (!rates) return null;
+    return { thb: jpy / rates.rateThbToJpy, mmk: jpy / rates.rateMmkToJpy };
+  };
 
   const ITEM_PRESETS = ['Cake', 'Real bouquet', 'Imitation bouquet', 'Toy bouquet', 'Candle', 'Postcard', 'Pop Mart blind box'];
   const DIGITAL_WEBSITE_PRICES = { standard: 800, premium: 2000 };
@@ -60,7 +83,7 @@ export default function PriceCalculator() {
       setResult(calc);
       setStatus('idle');
     } catch {
-      setErrorMsg('Could not reach the backend. Is it running on localhost:4000?');
+      setErrorMsg('Could not reach the backend.');
       setStatus('error');
     }
   };
@@ -267,6 +290,23 @@ export default function PriceCalculator() {
                 </div>
               </div>
 
+              {(() => {
+                const converted = convertFromThb(result.total);
+                return converted ? (
+                  <div className="currency-equivalents">
+                    <p className="field-hint">Equivalent in other currencies</p>
+                    <div className="ledger-row">
+                      <span>Japanese Yen</span>
+                      <span className="ledger-value">¥{converted.jpy.toFixed(0)}</span>
+                    </div>
+                    <div className="ledger-row">
+                      <span>Myanmar Kyat</span>
+                      <span className="ledger-value">{converted.mmk.toFixed(0)} MMK</span>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+
               <button
                 className="save-btn"
                 onClick={handleSave}
@@ -350,6 +390,23 @@ export default function PriceCalculator() {
                   <span className="ledger-value">¥{japanTotal.toFixed(0)}</span>
                 </div>
               </div>
+
+              {(() => {
+                const converted = convertFromJpy(japanTotal);
+                return converted ? (
+                  <div className="currency-equivalents">
+                    <p className="field-hint">Equivalent in other currencies</p>
+                    <div className="ledger-row">
+                      <span>Thai Baht</span>
+                      <span className="ledger-value">{converted.thb.toFixed(2)} THB</span>
+                    </div>
+                    <div className="ledger-row">
+                      <span>Myanmar Kyat</span>
+                      <span className="ledger-value">{converted.mmk.toFixed(0)} MMK</span>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
 
               <button
                 className="save-btn"

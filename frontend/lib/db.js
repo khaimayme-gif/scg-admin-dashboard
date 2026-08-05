@@ -49,6 +49,15 @@ function ensureSchema() {
         total REAL NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
+    `)).then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        rate_thb_to_jpy REAL,
+        rate_thb_to_mmk REAL,
+        rate_mmk_to_jpy REAL,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT settings_single_row CHECK (id = 1)
+      )
     `));
   }
   return schemaReady;
