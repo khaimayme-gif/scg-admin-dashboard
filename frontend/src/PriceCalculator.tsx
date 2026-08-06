@@ -45,16 +45,30 @@ export default function PriceCalculator() {
     return { thb: jpy / rates.rateThbToJpy, mmk: jpy / rates.rateMmkToJpy };
   };
 
-  const ITEM_PRESETS = ['Cake', 'Real bouquet', 'Imitation bouquet', 'Toy bouquet', 'Candle', 'Postcard', 'Pop Mart blind box'];
+  const [itemCatalog, setItemCatalog] = useState<{ name: string; original_cost: number | null }[]>([]);
+
+  useEffect(() => {
+    fetch('/api/items', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => setItemCatalog(data.map((i: { name: string; original_cost: number | null }) => ({ name: i.name, original_cost: i.original_cost }))))
+      .catch(() => {});
+  }, []);
+
+  const ITEM_PRESETS = itemCatalog.map((i) => i.name);
   const DIGITAL_WEBSITE_PRICES = { standard: 800, premium: 2000 };
 
   const updateItem = (id: string, field: 'name' | 'cost', value: string) => {
     setItems((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, [field]: field === 'cost' ? Number(value) || 0 : value }
-          : item
-      )
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        if (field === 'cost') return { ...item, cost: Number(value) || 0 };
+        const match = itemCatalog.find((catalogItem) => catalogItem.name === value);
+        return {
+          ...item,
+          name: value,
+          cost: match && match.original_cost !== null ? match.original_cost : item.cost,
+        };
+      })
     );
     setResult(null);
   };

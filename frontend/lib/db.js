@@ -58,6 +58,16 @@ function ensureSchema() {
         updated_at TIMESTAMPTZ DEFAULT NOW(),
         CONSTRAINT settings_single_row CHECK (id = 1)
       )
+    `)).then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS items (
+        id SERIAL PRIMARY KEY,
+        category TEXT NOT NULL,
+        name TEXT NOT NULL,
+        menu_price REAL NOT NULL,
+        original_cost REAL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
     `));
   }
   return schemaReady;

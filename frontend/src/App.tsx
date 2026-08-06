@@ -5,6 +5,7 @@ import QRCodeGenerator from './QRCodeGenerator';
 import Login from './Login';
 import './App.css';
 import Settings from './Settings';
+import Items from './Items';
 
 const API_BASE = '/api';
 
@@ -41,6 +42,7 @@ export default function App() {
         {active === 'price-calculator' && <PriceCalculator />}
         {active === 'qr' && <QRCodeGenerator />}
         {active === 'settings' && <Settings />}
+        {active === 'items' && <Items />}
       </main>
     </div>
   );

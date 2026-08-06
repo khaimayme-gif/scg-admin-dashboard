@@ -455,3 +455,10 @@ html, body, #root {
 .currency-equivalents { margin: 4px 0 8px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .currency-equivalents .field-hint { margin: 0 0 4px; }
 .currency-equivalents .ledger-row { font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 4px 0; }
+
+.items-category-panel { margin-bottom: 20px; }
+.items-table { width: 100%; border-collapse: collapse; }
+.items-table th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #8A887F; font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.items-table td { padding: 8px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: middle; }
+.items-price-cell { font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+.profit-negative { color: var(--error); }
