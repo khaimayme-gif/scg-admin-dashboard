@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/api/settings", "destination": "/api/settings/_root" },
+    { "source": "/api/items", "destination": "/api/items/_root" }
+  ]
+}
