@@ -2,7 +2,6 @@ const { requireAuth } = require('../../lib/auth');
 const { pool, ensureSchema } = require('../../lib/db');
 
 module.exports = async (req, res) => {
-  console.log({req, res})
   const raw = req.query.action || [];
   const segments = Array.isArray(raw) ? raw : [raw];
   const [first] = segments;
