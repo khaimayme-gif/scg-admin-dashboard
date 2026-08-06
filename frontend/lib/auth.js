@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+require('dotenv').config({path: "./.env.local"});
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SESSION_SECRET = process.env.SESSION_SECRET;

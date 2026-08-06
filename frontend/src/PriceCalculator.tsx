@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { calculatePrice, saveQuote, type PriceItem, type CalculationResult } from './api';
 
+const API_BASE = '/api';
+
 let nextId = 1;
 const newItem = (): PriceItem => ({ id: String(nextId++), name: '', cost: 0 });
 
@@ -25,7 +27,7 @@ export default function PriceCalculator() {
   const [rates, setRates] = useState<{ rateThbToJpy: number; rateThbToMmk: number; rateMmkToJpy: number } | null>(null);
 
   useEffect(() => {
-    fetch('/api/settings', { credentials: 'include' })
+    fetch(`${API_BASE}/settings`, { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => {
         if (data.rateThbToJpy && data.rateThbToMmk && data.rateMmkToJpy) {
@@ -48,7 +50,7 @@ export default function PriceCalculator() {
   const [itemCatalog, setItemCatalog] = useState<{ name: string; original_cost: number | null }[]>([]);
 
   useEffect(() => {
-    fetch('/api/items', { credentials: 'include' })
+    fetch(`${API_BASE}/items`, { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => setItemCatalog(data.map((i: { name: string; original_cost: number | null }) => ({ name: i.name, original_cost: i.original_cost }))))
       .catch(() => {});
@@ -136,7 +138,7 @@ export default function PriceCalculator() {
     if (japanTotal === null) return;
     setJapanStatus('saving');
     try {
-      const res = await fetch('/api/japan-quotes/save', {
+      const res = await fetch(`${API_BASE}/japan-quotes/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
