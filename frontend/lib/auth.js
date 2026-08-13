@@ -5,18 +5,38 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Session tokens are `<expiry>.<hmac>`. Without a real secret the hmac is forgeable by
+// anyone who can read this file, so we fail closed instead of falling back to a default.
+const SESSION_CONFIGURED = Boolean(SESSION_SECRET);
+if (!SESSION_CONFIGURED) {
+  console.error('SESSION_SECRET is not set. Sign-in is disabled until it is configured.');
+}
+
+// Compares via fixed-length digests so neither the contents nor the length leak through timing.
+function constantTimeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const digestA = crypto.createHash('sha256').update(a).digest();
+  const digestB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(digestA, digestB);
+}
+
 function sign(value) {
-  const hmac = crypto.createHmac('sha256', SESSION_SECRET || 'dev-secret').update(value).digest('hex');
+  if (!SESSION_CONFIGURED) throw new Error('SESSION_SECRET is not configured');
+  const hmac = crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('hex');
   return `${value}.${hmac}`;
 }
 
+function verifyPassword(password) {
+  if (!ADMIN_PASSWORD) return false;
+  return constantTimeEqual(password, ADMIN_PASSWORD);
+}
+
 function verifySignedToken(token) {
-  if (!token) return false;
+  if (!SESSION_CONFIGURED || !token) return false;
   const lastDot = token.lastIndexOf('.');
   if (lastDot === -1) return false;
   const value = token.slice(0, lastDot);
-  const expected = sign(value);
-  if (expected !== token) return false;
+  if (!constantTimeEqual(sign(value), token)) return false;
   const expiresAt = Number(value);
   return Number.isFinite(expiresAt) && Date.now() < expiresAt;
 }
@@ -35,11 +55,11 @@ function parseCookies(req) {
 function createSessionCookie() {
   const expiresAt = Date.now() + SESSION_MAX_AGE_MS;
   const token = sign(String(expiresAt));
-  return `scg_session=${encodeURIComponent(token)}; HttpOnly; Max-Age=${SESSION_MAX_AGE_MS / 1000}; SameSite=Lax; Path=/`;
+  return `scg_session=${encodeURIComponent(token)}; HttpOnly; Secure; Max-Age=${SESSION_MAX_AGE_MS / 1000}; SameSite=Lax; Path=/`;
 }
 
 function clearSessionCookie() {
-  return 'scg_session=; HttpOnly; Max-Age=0; SameSite=Lax; Path=/';
+  return 'scg_session=; HttpOnly; Secure; Max-Age=0; SameSite=Lax; Path=/';
 }
 
 function requireAuth(req, res) {
@@ -50,7 +70,8 @@ function requireAuth(req, res) {
 }
 
 module.exports = {
-  ADMIN_PASSWORD,
+  SESSION_CONFIGURED,
+  verifyPassword,
   parseCookies,
   verifySignedToken,
   createSessionCookie,

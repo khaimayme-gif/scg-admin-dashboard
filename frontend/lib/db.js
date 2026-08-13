@@ -17,6 +17,11 @@ const pool = new Pool({
   ssl: process.env.POSTGRES_URL && process.env.POSTGRES_URL.includes('localhost')
     ? false
     : { rejectUnauthorized: false },
+  // Every warm function instance holds its own pool and Vercel scales instances out freely,
+  // so keep each one small to avoid exhausting Postgres connections.
+  max: 3,
+  idleTimeoutMillis: 10_000,
+  connectionTimeoutMillis: 10_000,
 });
 
 let schemaReady = null;
@@ -68,6 +73,15 @@ function ensureSchema() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )
+    `)).then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS login_attempts (
+        id SERIAL PRIMARY KEY,
+        ip TEXT NOT NULL,
+        attempted_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `)).then(() => pool.query(`
+      CREATE INDEX IF NOT EXISTS login_attempts_ip_time
+        ON login_attempts (ip, attempted_at)
     `));
   }
   return schemaReady;

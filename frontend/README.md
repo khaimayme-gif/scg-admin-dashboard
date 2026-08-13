@@ -1,32 +1,19 @@
-# React + TypeScript + Vite
+# frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The deployed application: React + TypeScript SPA in `src/`, Vercel serverless functions in
+`api/`, shared function code in `lib/`. Vercel's Root Directory is set to this folder.
 
-Currently, two official plugins are available:
+See the [root README](../README.md) for architecture, environment variables, deployment and
+the constraints that shape the `api/` layout.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Scripts
 
-## React Compiler
+| Command | Does |
+|---|---|
+| `npm run build` | `tsc -b && vite build` — same command Vercel runs |
+| `npm run lint` | Oxlint over `src/` (`api/` and `lib/` are not covered) |
+| `npm run dev` | Vite dev server; `/api/*` routes are **not** served, so the app cannot sign in |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Local development is not the normal workflow here — changes go out by pushing to `main`. To
+exercise the functions locally you would need the Vercel CLI (`vercel dev`) plus a
+`.env.local` holding `POSTGRES_URL`, `ADMIN_PASSWORD` and `SESSION_SECRET`.

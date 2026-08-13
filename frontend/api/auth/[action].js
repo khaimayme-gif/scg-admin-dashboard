@@ -1,16 +1,35 @@
-const { ADMIN_PASSWORD, createSessionCookie, clearSessionCookie, parseCookies, verifySignedToken } = require('../../lib/auth');
+const { SESSION_CONFIGURED, verifyPassword, createSessionCookie, clearSessionCookie, parseCookies, verifySignedToken } = require('../../lib/auth');
+const { clientIp, isLockedOut, recordFailure, clearFailures } = require('../../lib/rate-limit');
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   const { action } = req.query;
 
   if (action === 'login') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const { password } = req.body;
-    if (!ADMIN_PASSWORD || password !== ADMIN_PASSWORD) {
-      return res.status(401).json({ error: 'Incorrect password' });
+    if (!SESSION_CONFIGURED) {
+      console.error('Sign-in attempted but SESSION_SECRET is not configured.');
+      return res.status(500).json({ error: 'Server is not configured for sign-in' });
     }
-    res.setHeader('Set-Cookie', createSessionCookie());
-    return res.status(200).json({ ok: true });
+
+    const ip = clientIp(req);
+    try {
+      if (await isLockedOut(ip)) {
+        return res.status(429).json({ error: 'Too many attempts. Try again in 15 minutes.' });
+      }
+
+      const { password } = req.body || {};
+      if (!verifyPassword(password)) {
+        await recordFailure(ip);
+        return res.status(401).json({ error: 'Incorrect password' });
+      }
+
+      await clearFailures(ip);
+      res.setHeader('Set-Cookie', createSessionCookie());
+      return res.status(200).json({ ok: true });
+    } catch (err) {
+      console.error('Sign-in failed', err);
+      return res.status(500).json({ error: 'Sign-in is temporarily unavailable' });
+    }
   }
 
   if (action === 'logout') {

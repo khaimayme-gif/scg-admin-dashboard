@@ -23,13 +23,22 @@ export default function Login({ onSuccess }: LoginProps) {
         body: JSON.stringify({ password }),
       });
       if (!res.ok) {
-        setErrorMsg('Incorrect password.');
+        // The server explains rate limiting and misconfiguration in its error body; fall
+        // back to the generic message if there isn't one.
+        let message = 'Incorrect password.';
+        try {
+          const data = await res.json();
+          if (data?.error) message = data.error;
+        } catch {
+          // no JSON body, keep the default
+        }
+        setErrorMsg(message);
         setStatus('idle');
         return;
       }
       onSuccess();
     } catch {
-      setErrorMsg('Could not reach the backend. Is it running on localhost:4000?');
+      setErrorMsg('Could not reach the server. Check your connection and try again.');
       setStatus('idle');
     }
   };
