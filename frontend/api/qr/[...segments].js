@@ -1,11 +1,15 @@
-const { requireAuth } = require('../auth');
-const { pool, ensureSchema } = require('../db');
+const { requireAuth } = require('../../lib/auth');
+const { pool, ensureSchema } = require('../../lib/db');
 
-module.exports = async (req, res, [first, second]) => {
+module.exports = async (req, res) => {
+  const raw = req.query.segments || [];
+  const segments = Array.isArray(raw) ? raw : [raw];
+  const [first, second] = segments;
+
   if (first === 'save' && req.method === 'POST') {
     if (!requireAuth(req, res)) return;
     await ensureSchema();
-    const { url, label, theme } = req.body || {};
+    const { url, label, theme } = req.body;
     if (!url || !url.trim()) return res.status(400).json({ error: 'url is required' });
     const result = await pool.query(
       'INSERT INTO qr_codes (url, label, theme) VALUES ($1, $2, $3) RETURNING id',
@@ -23,7 +27,6 @@ module.exports = async (req, res, [first, second]) => {
 
   if (first === 'history' && second && req.method === 'DELETE') {
     if (!requireAuth(req, res)) return;
-    if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     await ensureSchema();
     await pool.query('DELETE FROM qr_codes WHERE id = $1', [second]);
     return res.status(200).json({ deleted: true });

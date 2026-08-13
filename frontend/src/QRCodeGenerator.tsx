@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import QRCodeStyling from 'qr-code-styling';
-import { apiFetch, jsonBody } from './api';
 import sochicLogo from './assets/sochic-logo.png';
+
+const API_BASE = '/api';
 
 type ThemeId = 'blossom' | 'rosegold' | 'sage' | 'classic';
 
@@ -108,7 +109,7 @@ export default function QRCodeGenerator() {
 
   const loadHistory = async () => {
     try {
-      const res = await apiFetch('/qr/history');
+      const res = await fetch(`${API_BASE}/qr/history`);
       if (res.ok) setHistory(await res.json());
     } catch {
       // silent - history is a nice-to-have, not critical path
@@ -135,7 +136,11 @@ export default function QRCodeGenerator() {
     if (!resolvedUrl) return;
     setStatus('saving');
     try {
-      await apiFetch('/qr/save', jsonBody({ url: resolvedUrl, label: labelInput.trim() || null, theme }));
+      await fetch(`${API_BASE}/qr/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: resolvedUrl, label: labelInput.trim() || null, theme }),
+      });
       setStatus('saved');
       setLabelInput('');
       await loadHistory();
@@ -147,7 +152,7 @@ export default function QRCodeGenerator() {
   };
 
   const handleDelete = async (id: number) => {
-    await apiFetch(`/qr/history/${id}`, { method: 'DELETE' });
+    await fetch(`${API_BASE}/qr/history/${id}`, { method: 'DELETE' });
     await loadHistory();
   };
 

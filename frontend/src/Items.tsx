@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { apiFetch, jsonBody } from './api';
+
+const API_BASE = '/api';
 
 interface Item {
   id: number;
@@ -19,7 +20,7 @@ export default function Items() {
   const [newMenuPrice, setNewMenuPrice] = useState('');
 
   const loadItems = () => {
-    apiFetch('/items')
+    fetch(`${API_BASE}/items`, { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => {
         setItems(data);
@@ -39,30 +40,36 @@ export default function Items() {
   const handleSaveCost = async (item: Item) => {
     setSavingId(item.id);
     try {
-      await apiFetch('/items/save', jsonBody({
-        id: item.id,
-        category: item.category,
-        name: item.name,
-        menuPrice: item.menu_price,
-        originalCost: item.original_cost,
-      }));
+      await fetch(`${API_BASE}/items/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          id: item.id,
+          category: item.category,
+          name: item.name,
+          menuPrice: item.menu_price,
+          originalCost: item.original_cost,
+        }),
+      });
     } finally {
       setSavingId(null);
     }
   };
 
   const handleDelete = async (id: number) => {
-    await apiFetch(`/items/delete/${id}`, { method: 'DELETE' });
+    await fetch(`${API_BASE}/items/delete/${id}`, { method: 'DELETE', credentials: 'include' });
     loadItems();
   };
 
   const handleAddItem = async () => {
     if (!newCategory.trim() || !newName.trim() || !newMenuPrice) return;
-    await apiFetch('/items/save', jsonBody({
-      category: newCategory.trim(),
-      name: newName.trim(),
-      menuPrice: Number(newMenuPrice),
-    }));
+    await fetch(`${API_BASE}/items/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ category: newCategory.trim(), name: newName.trim(), menuPrice: Number(newMenuPrice) }),
+    });
     setNewCategory('');
     setNewName('');
     setNewMenuPrice('');
