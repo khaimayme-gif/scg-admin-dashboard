@@ -14,9 +14,13 @@ backend service — the API is Vercel serverless functions living alongside the 
 ```
 frontend/            <- Vercel Root Directory is set to this folder
 ├── src/             React 19 + TypeScript SPA, built by Vite to dist/
-├── api/             one file per route group -> Vercel Functions (Node.js, CommonJS)
-├── lib/             shared code, bundled into each function (never a route itself)
-└── vercel.json      rewrites for bare collection URLs
+├── api/
+│   └── [...path].js the single Vercel Function; dispatches on the first path segment
+└── lib/             never routes, so never functions
+    ├── auth.js      sessions, password check
+    ├── db.js        pg pool + ensureSchema
+    ├── rate-limit.js
+    └── routes/      one module per resource, called by the dispatcher
 backend/             deprecated, replaced by frontend/api/ — nothing here deploys
 ```
 
@@ -61,20 +65,52 @@ Use Supabase's **pooler** connection string (port 6543), not the direct one (543
 run in `iad1` (us-east-1) by default — if the Supabase project is hosted in Asia, every query
 crosses the Pacific. Either move the database or pin the function region to match it.
 
-## The 12-function limit
+## Why the API is one function
 
 Vercel's Hobby plan allows **12 functions per deployment**, and without a framework every file
-in `api/` becomes exactly one function. This is why routes are grouped into catch-all handlers
-(`[action].js`, `[...action].js`) that dispatch on the path segment instead of one file per
-endpoint — an earlier layout used 19 files and hit the ceiling.
+under `api/` becomes exactly one function. An early layout used 19 files and hit that ceiling;
+grouping into per-resource catch-alls brought it to 7, which still would not have fitted the
+seven unbuilt modules below.
 
-Currently **7 functions** are used, so there are 5 left. When adding features, add branches
-inside the existing handlers rather than new top-level folders under `api/`.
+So the whole API is a single dispatcher, [`api/[...path].js`](frontend/api/%5B...path%5D.js).
+It splits the path, looks the first segment up in a route table, and delegates to a module in
+`lib/routes/`. **Function count is 1 and stays 1** no matter how many endpoints get added.
 
-Catch-all routes cannot match an empty path segment, so bare collection URLs need a rewrite to
-a `_root` sentinel in [`frontend/vercel.json`](frontend/vercel.json). `/api/settings` and
-`/api/items` have one; `/api/japan-quotes` does not, so its list route is currently
-unreachable.
+Two things fall out of this:
+
+- A bare collection path like `/api/items` is just a one-segment request, so it routes normally.
+  The old `_root` rewrites in `vercel.json` are gone, and `vercel.json` with them.
+- Every request passes through one try/catch, so a database error is logged with its method and
+  path and returns a JSON 500 instead of becoming an unhandled rejection.
+
+### Adding a resource
+
+1. Create `lib/routes/<name>.js` exporting `async (req, res, rest)`, where `rest` is the path
+   segments after the resource name — `/api/items/delete/7` gives `['delete', '7']`.
+2. Add one line to the `ROUTES` table in `api/[...path].js`.
+
+Guard each branch on both the segment and `req.method`, and call `requireAuth(req, res)` first.
+Return a 404 at the end for anything unmatched.
+
+## Routes
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/health` | GET | liveness only, touches nothing |
+| `/api/auth/{login,logout,check}` | POST/POST/GET | login is rate limited |
+| `/api/items` | GET | list, grouped by category in the UI |
+| `/api/items/save` | POST | insert, or update when `id` is present |
+| `/api/items/delete/:id` | DELETE | numeric ids only |
+| `/api/settings` | GET | current exchange rates |
+| `/api/settings/save` | POST | upsert into the single-row table |
+| `/api/price-calculator/calculate` | POST | pure maths, no database |
+| `/api/price-calculator/save` | POST | store a Thailand quote |
+| `/api/price-calculator/quotes` | GET | **no caller yet** |
+| `/api/japan-quotes` | GET | **no caller yet** |
+| `/api/japan-quotes/save` | POST | store a Japan quote |
+| `/api/qr/save` | POST | store a generated code |
+| `/api/qr/history` | GET | list saved codes |
+| `/api/qr/history/:id` | DELETE | numeric ids only |
 
 ## Database and schema changes
 
@@ -110,11 +146,20 @@ Expense Tracker, Monthly Profit. These appear in the sidebar disabled with a "so
 
 Navigation is `useState` in `App.tsx`, not a router, so there are no deep links.
 
+## Sessions expiring
+
+`App.tsx` checks authentication once on mount. Anything that 401s afterwards goes through
+`apiFetch` in [`src/api.ts`](frontend/src/api.ts), which calls the handler registered by
+`App.tsx` and returns the user to the login screen. Without that, an expired cookie showed up
+as empty panels — no rates, no autocomplete, an empty Items table — while still looking signed
+in, which reads like a broken API.
+
+The three auth-flow calls (`login`, `logout`, `check`) deliberately use plain `fetch`, since
+they are what establishes auth state in the first place.
+
 ## Known gaps
 
-- API handlers do not wrap `pool.query` in try/catch (except sign-in), so a database error
-  becomes an unhandled rejection and a generic 500. The UI then shows "Could not reach the
-  backend", which is misleading — the real cause is only in the runtime logs.
-- `GET /api/price-calculator/quotes` and `GET /api/japan-quotes` exist but nothing in the UI
-  calls them. Saved quotes are write-only today.
+- `GET /api/price-calculator/quotes` and `GET /api/japan-quotes` work but nothing in the UI
+  calls them, so saved quotes are still write-only.
 - Preview deployments share `POSTGRES_URL` with production, so branches write to live data.
+- `api/` and `lib/` are plain JavaScript: no type checking and Oxlint does not cover them.

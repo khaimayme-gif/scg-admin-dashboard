@@ -1,12 +1,8 @@
-const { requireAuth } = require('../../lib/auth');
-const { pool, ensureSchema } = require('../../lib/db');
+const { requireAuth } = require('../auth');
+const { pool, ensureSchema } = require('../db');
 
-module.exports = async (req, res) => {
-  const raw = req.query.action || [];
-  const segments = Array.isArray(raw) ? raw : [raw];
-  const [first] = segments;
-
-  if ((!first || first === '_root') && req.method === 'GET') {
+module.exports = async (req, res, [first]) => {
+  if (!first && req.method === 'GET') {
     if (!requireAuth(req, res)) return;
     await ensureSchema();
     const result = await pool.query('SELECT * FROM japan_quotes ORDER BY created_at DESC');
@@ -16,7 +12,7 @@ module.exports = async (req, res) => {
   if (first === 'save' && req.method === 'POST') {
     if (!requireAuth(req, res)) return;
     await ensureSchema();
-    const { giftCost, japanFee, thailandFee, total } = req.body;
+    const { giftCost, japanFee, thailandFee, total } = req.body || {};
     if (giftCost === undefined || total === undefined) {
       return res.status(400).json({ error: 'giftCost and total are required' });
     }

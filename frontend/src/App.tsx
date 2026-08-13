@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { setUnauthorizedHandler } from './api';
 import Sidebar from './Sidebar';
 import PriceCalculator from './PriceCalculator';
 import QRCodeGenerator from './QRCodeGenerator';
@@ -20,6 +21,13 @@ export default function App() {
       .then((data) => setAuthenticated(!!data.authenticated))
       .catch(() => setAuthenticated(false))
       .finally(() => setAuthChecked(true));
+  }, []);
+
+  // Any request that comes back 401 means the session lapsed, so drop straight back to login
+  // instead of leaving the shell up with empty panels.
+  useEffect(() => {
+    setUnauthorizedHandler(() => setAuthenticated(false));
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const handleLogout = async () => {

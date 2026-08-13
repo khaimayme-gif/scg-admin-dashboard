@@ -1,12 +1,8 @@
-const { requireAuth } = require('../../lib/auth');
-const { pool, ensureSchema } = require('../../lib/db');
+const { requireAuth } = require('../auth');
+const { pool, ensureSchema } = require('../db');
 
-module.exports = async (req, res) => {
-  const raw = req.query.action || [];
-  const segments = Array.isArray(raw) ? raw : [raw];
-  const [first] = segments;
-
-  if ((!first || first === '_root') && req.method === 'GET') {
+module.exports = async (req, res, [first]) => {
+  if (!first && req.method === 'GET') {
     if (!requireAuth(req, res)) return;
     await ensureSchema();
     const result = await pool.query('SELECT * FROM settings WHERE id = 1');
@@ -21,7 +17,7 @@ module.exports = async (req, res) => {
   if (first === 'save' && req.method === 'POST') {
     if (!requireAuth(req, res)) return;
     await ensureSchema();
-    const { rateThbToJpy, rateThbToMmk, rateMmkToJpy } = req.body;
+    const { rateThbToJpy, rateThbToMmk, rateMmkToJpy } = req.body || {};
     await pool.query(
       `INSERT INTO settings (id, rate_thb_to_jpy, rate_thb_to_mmk, rate_mmk_to_jpy, updated_at)
        VALUES (1, $1, $2, $3, NOW())
