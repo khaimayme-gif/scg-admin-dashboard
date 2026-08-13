@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-
-const API_BASE = '/api';
+import { apiFetch, jsonBody } from './api';
 
 interface Item {
   id: number;
@@ -20,7 +19,7 @@ export default function Items() {
   const [newMenuPrice, setNewMenuPrice] = useState('');
 
   const loadItems = () => {
-    fetch(`${API_BASE}/items`, { credentials: 'include' })
+    apiFetch('/items')
       .then((res) => res.json())
       .then((data) => {
         setItems(data);
@@ -40,36 +39,40 @@ export default function Items() {
   const handleSaveCost = async (item: Item) => {
     setSavingId(item.id);
     try {
-      await fetch(`${API_BASE}/items/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          id: item.id,
-          category: item.category,
-          name: item.name,
-          menuPrice: item.menu_price,
-          originalCost: item.original_cost,
-        }),
-      });
+      await apiFetch('/items/save', jsonBody({
+        id: item.id,
+        category: item.category,
+        name: item.name,
+        menuPrice: item.menu_price,
+        originalCost: item.original_cost,
+      }));
+    } catch {
+      // a 401 has already sent us back to login; nothing useful to show on this row
     } finally {
       setSavingId(null);
     }
   };
 
   const handleDelete = async (id: number) => {
-    await fetch(`${API_BASE}/items/delete/${id}`, { method: 'DELETE', credentials: 'include' });
+    try {
+      await apiFetch(`/items/delete/${id}`, { method: 'DELETE' });
+    } catch {
+      return;
+    }
     loadItems();
   };
 
   const handleAddItem = async () => {
     if (!newCategory.trim() || !newName.trim() || !newMenuPrice) return;
-    await fetch(`${API_BASE}/items/save`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ category: newCategory.trim(), name: newName.trim(), menuPrice: Number(newMenuPrice) }),
-    });
+    try {
+      await apiFetch('/items/save', jsonBody({
+        category: newCategory.trim(),
+        name: newName.trim(),
+        menuPrice: Number(newMenuPrice),
+      }));
+    } catch {
+      return;
+    }
     setNewCategory('');
     setNewName('');
     setNewMenuPrice('');

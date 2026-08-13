@@ -14,9 +14,10 @@ backend service — the API is Vercel serverless functions living alongside the 
 ```
 frontend/            <- Vercel Root Directory is set to this folder
 ├── src/             React 19 + TypeScript SPA, built by Vite to dist/
-├── api/             one file per route group -> Vercel Functions (Node.js, CommonJS)
+├── api/index.js     the single Vercel Function; all /api/* is rewritten to it
+├── lib/routes/      one module per resource, called by the dispatcher (never functions)
 ├── lib/             shared code, bundled into each function (never a route itself)
-└── vercel.json      rewrites for bare collection URLs
+└── vercel.json      the one rewrite that routes /api/* to api/index.js
 backend/             deprecated, replaced by frontend/api/ — nothing here deploys
 ```
 
@@ -61,20 +62,60 @@ Use Supabase's **pooler** connection string (port 6543), not the direct one (543
 run in `iad1` (us-east-1) by default — if the Supabase project is hosted in Asia, every query
 crosses the Pacific. Either move the database or pin the function region to match it.
 
-## The 12-function limit
+## Routing: read this before adding an endpoint
 
-Vercel's Hobby plan allows **12 functions per deployment**, and without a framework every file
-in `api/` becomes exactly one function. This is why routes are grouped into catch-all handlers
-(`[action].js`, `[...action].js`) that dispatch on the path segment instead of one file per
-endpoint — an earlier layout used 19 files and hit the ceiling.
+**Vercel's zero-config `api/` directory does not support `[...param]` catch-all filenames.**
+The segment name is taken literally, so `req.query.param` is `undefined`, and any path with an
+extra segment never reaches the function at all. Plain `[param]` works. `[...param]` does not.
 
-Currently **7 functions** are used, so there are 5 left. When adding features, add branches
-inside the existing handlers rather than new top-level folders under `api/`.
+This was learned the hard way. Commit `7dc9894` renamed the endpoint files to `[...action].js`
+to get under the function limit, and from then until `a9f44ee` **seven endpoints silently
+404'd in production** — saving items, deleting items, saving settings, saving Japan quotes, and
+all three QR routes. The `_root` rewrites that used to be in `vercel.json` were patching two
+visible symptoms of this, not the cause.
 
-Catch-all routes cannot match an empty path segment, so bare collection URLs need a rewrite to
-a `_root` sentinel in [`frontend/vercel.json`](frontend/vercel.json). `/api/settings` and
-`/api/items` have one; `/api/japan-quotes` does not, so its list route is currently
-unreachable.
+The layout now avoids dynamic filenames entirely:
+
+- One function, `api/index.js` — a static filename, which is always safe.
+- One rewrite in [`frontend/vercel.json`](frontend/vercel.json) sends every `/api/*` request to
+  it: `{ "source": "/api/(.*)", "destination": "/api/index?apiPath=$1" }`.
+- `api/index.js` splits the path itself and delegates to `lib/routes/<name>.js`.
+
+The dispatcher reads the path from `req.url`, which the rewrite leaves as the original request
+path, and falls back to the `?apiPath=` capture. Both were verified against the deployed
+platform with a throwaway probe endpoint; neither is assumed.
+
+Consequences worth knowing:
+
+- **Function count is 1 and stays 1.** Hobby allows 12 per deployment and, without a framework,
+  every file under `api/` becomes one. New endpoints now cost a branch, not a slot. The seven
+  unbuilt modules below would not have fitted the old one-folder-per-resource layout.
+- Bare collection paths like `/api/items` are ordinary one-segment requests, so no `_root`
+  sentinel is needed and `GET /api/japan-quotes` works.
+- Every request passes through one try/catch, so a database error is logged with its method and
+  path and returns a JSON 500 instead of becoming an unhandled rejection.
+
+### Adding a resource
+
+1. Create `lib/routes/<name>.js` exporting `async (req, res, rest)`, where `rest` is the path
+   segments after the resource name — `/api/items/delete/7` gives `['delete', '7']`.
+2. Add one line to the `ROUTES` table in `api/index.js`.
+
+Guard each branch on both the segment and `req.method`, and call `requireAuth(req, res)` first.
+Return a 404 at the end for anything unmatched. Do not create new files under `api/`.
+
+### Verifying a routing change
+
+`404` means a path never reached its branch; `401` means it routed and hit the auth guard. So an
+unauthenticated probe distinguishes the two without logging in:
+
+```
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<deployment>/api/items/save   # expect 401
+curl -s -o /dev/null -w '%{http_code}\n' https://<deployment>/api/nope                 # expect 404
+```
+
+Preview deployments sit behind Vercel SSO, so they cannot be probed anonymously — either use a
+Protection Bypass token or test against production.
 
 ## Database and schema changes
 
@@ -110,11 +151,21 @@ Expense Tracker, Monthly Profit. These appear in the sidebar disabled with a "so
 
 Navigation is `useState` in `App.tsx`, not a router, so there are no deep links.
 
+## Sessions expiring
+
+`App.tsx` checks authentication once on mount. Anything that 401s afterwards goes through
+`apiFetch` in [`frontend/src/api.ts`](frontend/src/api.ts), which calls the handler registered
+by `App.tsx` and returns the user to the login screen. Without that, an expired cookie showed up
+as empty panels — no rates, no autocomplete, an empty Items table — while still looking signed
+in, which reads like a broken API.
+
+The three auth-flow calls (`login`, `logout`, `check`) deliberately use plain `fetch`, since
+they are what establishes auth state in the first place.
+
 ## Known gaps
 
-- API handlers do not wrap `pool.query` in try/catch (except sign-in), so a database error
-  becomes an unhandled rejection and a generic 500. The UI then shows "Could not reach the
-  backend", which is misleading — the real cause is only in the runtime logs.
-- `GET /api/price-calculator/quotes` and `GET /api/japan-quotes` exist but nothing in the UI
-  calls them. Saved quotes are write-only today.
+- `GET /api/price-calculator/quotes` and `GET /api/japan-quotes` work but nothing in the UI
+  calls them, so saved quotes are still write-only.
 - Preview deployments share `POSTGRES_URL` with production, so branches write to live data.
+- `api/` and `lib/` are plain JavaScript: no type checking, and Oxlint does not cover them. A
+  mistake there deploys cleanly and fails at runtime.

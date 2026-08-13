@@ -1,8 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/settings", "destination": "/api/settings/_root" },
-    { "source": "/api/items", "destination": "/api/items/_root" },
-    { "source": "/api/probe/:rest*", "destination": "/api/probe?captured=:rest*" },
-    { "source": "/api/probe2/(.*)", "destination": "/api/probe?regexCaptured=$1" }
+    { "source": "/api/(.*)", "destination": "/api/index?apiPath=$1" }
   ]
 }

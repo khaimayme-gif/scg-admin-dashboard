@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-
-const API_BASE = '/api';
+import { apiFetch, jsonBody } from './api';
 
 export default function Settings() {
   const [rateThbToJpy, setRateThbToJpy] = useState('');
@@ -10,7 +9,7 @@ export default function Settings() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    fetch(`${API_BASE}/settings`, { credentials: 'include' })
+    apiFetch('/settings')
       .then((res) => res.json())
       .then((data) => {
         if (data.rateThbToJpy !== null) setRateThbToJpy(String(data.rateThbToJpy));
@@ -28,16 +27,11 @@ export default function Settings() {
     setStatus('saving');
     setErrorMsg('');
     try {
-      const res = await fetch(`${API_BASE}/settings/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          rateThbToJpy: Number(rateThbToJpy) || 0,
-          rateThbToMmk: Number(rateThbToMmk) || 0,
-          rateMmkToJpy: Number(rateMmkToJpy) || 0,
-        }),
-      });
+      const res = await apiFetch('/settings/save', jsonBody({
+        rateThbToJpy: Number(rateThbToJpy) || 0,
+        rateThbToMmk: Number(rateThbToMmk) || 0,
+        rateMmkToJpy: Number(rateMmkToJpy) || 0,
+      }));
       if (!res.ok) throw new Error();
       setStatus('saved');
       setTimeout(() => setStatus('idle'), 2000);

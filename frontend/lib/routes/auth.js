@@ -1,9 +1,7 @@
-const { SESSION_CONFIGURED, verifyPassword, createSessionCookie, clearSessionCookie, parseCookies, verifySignedToken } = require('../../lib/auth');
-const { clientIp, isLockedOut, recordFailure, clearFailures } = require('../../lib/rate-limit');
+const { SESSION_CONFIGURED, verifyPassword, createSessionCookie, clearSessionCookie, parseCookies, verifySignedToken } = require('../auth');
+const { clientIp, isLockedOut, recordFailure, clearFailures } = require('../rate-limit');
 
-module.exports = async (req, res) => {
-  const { action } = req.query;
-
+module.exports = async (req, res, [action]) => {
   if (action === 'login') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     if (!SESSION_CONFIGURED) {
