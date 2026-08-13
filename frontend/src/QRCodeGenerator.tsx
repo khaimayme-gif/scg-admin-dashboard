@@ -147,7 +147,11 @@ export default function QRCodeGenerator() {
   };
 
   const handleDelete = async (id: number) => {
-    await apiFetch(`/qr/history/${id}`, { method: 'DELETE' });
+    try {
+      await apiFetch(`/qr/history/${id}`, { method: 'DELETE' });
+    } catch {
+      return;
+    }
     await loadHistory();
   };
 

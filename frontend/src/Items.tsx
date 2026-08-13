@@ -46,23 +46,33 @@ export default function Items() {
         menuPrice: item.menu_price,
         originalCost: item.original_cost,
       }));
+    } catch {
+      // a 401 has already sent us back to login; nothing useful to show on this row
     } finally {
       setSavingId(null);
     }
   };
 
   const handleDelete = async (id: number) => {
-    await apiFetch(`/items/delete/${id}`, { method: 'DELETE' });
+    try {
+      await apiFetch(`/items/delete/${id}`, { method: 'DELETE' });
+    } catch {
+      return;
+    }
     loadItems();
   };
 
   const handleAddItem = async () => {
     if (!newCategory.trim() || !newName.trim() || !newMenuPrice) return;
-    await apiFetch('/items/save', jsonBody({
-      category: newCategory.trim(),
-      name: newName.trim(),
-      menuPrice: Number(newMenuPrice),
-    }));
+    try {
+      await apiFetch('/items/save', jsonBody({
+        category: newCategory.trim(),
+        name: newName.trim(),
+        menuPrice: Number(newMenuPrice),
+      }));
+    } catch {
+      return;
+    }
     setNewCategory('');
     setNewName('');
     setNewMenuPrice('');
