@@ -1,10 +1,14 @@
 # frontend
 
-The deployed application: React + TypeScript SPA in `src/`, Vercel serverless functions in
-`api/`, shared function code in `lib/`. Vercel's Root Directory is set to this folder.
+The deployed application. Vercel's Root Directory is set to this folder.
 
-See the [root README](../README.md) for architecture, environment variables, deployment and
-the constraints that shape the `api/` layout.
+- `src/` — React + TypeScript SPA
+- `api/index.js` — the single Vercel Function; every `/api/*` request is rewritten to it
+- `lib/` — shared code and the per-resource route modules in `lib/routes/`
+
+**Do not add files under `api/`.** Each one becomes another Vercel Function, and `[...param]`
+catch-all filenames silently do not work here. See the [root README](../README.md) for why, plus
+architecture, environment variables, the route table and how to verify a routing change.
 
 ## Scripts
 

@@ -9,20 +9,28 @@ Not launched yet.
 ## Architecture
 
 Everything deploys as **one Vercel project rooted at `frontend/`**. There is no separate
-backend service — the API is Vercel serverless functions living alongside the React app.
+backend service — the whole API is a single Vercel Function sitting alongside the React app.
 
 ```
-frontend/            <- Vercel Root Directory is set to this folder
-├── src/             React 19 + TypeScript SPA, built by Vite to dist/
-├── api/index.js     the single Vercel Function; all /api/* is rewritten to it
-├── lib/routes/      one module per resource, called by the dispatcher (never functions)
-├── lib/             shared code, bundled into each function (never a route itself)
-└── vercel.json      the one rewrite that routes /api/* to api/index.js
-backend/             deprecated, replaced by frontend/api/ — nothing here deploys
+frontend/              <- Vercel Root Directory is set to this folder
+├── src/               React 19 + TypeScript SPA, built by Vite to dist/
+├── api/index.js       the ONLY Vercel Function; every /api/* request is rewritten to it
+├── lib/               not under api/, so none of this becomes a function
+│   ├── auth.js        sessions, password check
+│   ├── db.js          pg pool + ensureSchema
+│   ├── rate-limit.js  failed sign-in counter
+│   └── routes/        one module per resource, called by the dispatcher
+└── vercel.json        the single rewrite that sends /api/* to api/index.js
+backend/               deprecated, replaced by frontend/api/ — nothing here deploys
 ```
 
 The SPA calls the API with relative `/api/...` paths, so the frontend and API are the same
 origin. No CORS, and the session cookie just works.
+
+`api/` and `lib/` each carry a one-line `package.json` setting `"type": "commonjs"`, because the
+root `frontend/package.json` is `"type": "module"` for the Vite build. That is why server code
+uses `require` while the SPA uses `import`. New files in either directory inherit this, and so do
+new subdirectories such as `lib/routes/`, since Node walks up to the nearest `package.json`.
 
 ## Deploying
 
@@ -58,9 +66,13 @@ repo. Set them for Preview as well as Production, or preview deployments will no
 predictable secret would let anyone forge an admin session. If it is unset the app logs an
 error and refuses to sign anyone in.
 
-Use Supabase's **pooler** connection string (port 6543), not the direct one (5432). Functions
-run in `iad1` (us-east-1) by default — if the Supabase project is hosted in Asia, every query
-crosses the Pacific. Either move the database or pin the function region to match it.
+Use Supabase's **pooler** connection string (port 6543), not the direct one (5432).
+
+Functions run in **`iad1`** (us-east-1). That is measured, not assumed: the `x-vercel-id`
+response header reads `sin1::iad1::…`, meaning the Singapore edge forwards to a Washington DC
+function. So if the Supabase project is hosted in Asia, every query crosses the Pacific — and
+`ensureSchema()` adds more round trips on each cold start. Either move the database near `iad1`
+or pin the function region to match the database.
 
 ## Routing: read this before adding an endpoint
 
@@ -69,10 +81,11 @@ The segment name is taken literally, so `req.query.param` is `undefined`, and an
 extra segment never reaches the function at all. Plain `[param]` works. `[...param]` does not.
 
 This was learned the hard way. Commit `7dc9894` renamed the endpoint files to `[...action].js`
-to get under the function limit, and from then until `a9f44ee` **seven endpoints silently
-404'd in production** — saving items, deleting items, saving settings, saving Japan quotes, and
-all three QR routes. The `_root` rewrites that used to be in `vercel.json` were patching two
-visible symptoms of this, not the cause.
+to get under the function limit, and from then until the fix in `59fa013` **seven endpoints
+silently 404'd in production** — saving items, deleting items, saving settings, saving Japan
+quotes, and all three QR routes. The app could read but could not write anything except Thailand
+quotes. The `_root` rewrites that used to be in `vercel.json` were patching two visible symptoms
+of this, not the cause.
 
 The layout now avoids dynamic filenames entirely:
 
@@ -117,6 +130,36 @@ curl -s -o /dev/null -w '%{http_code}\n' https://<deployment>/api/nope          
 Preview deployments sit behind Vercel SSO, so they cannot be probed anonymously — either use a
 Protection Bypass token or test against production.
 
+## Routes
+
+Every one of these is served by `api/index.js`. The handler module is `lib/routes/<resource>.js`.
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/health` | GET | liveness only, touches nothing — useful when the database is the problem |
+| `/api/auth/login` | POST | rate limited: 10 failures per IP per 15 minutes, then 429 |
+| `/api/auth/logout` | POST | clears the cookie |
+| `/api/auth/check` | GET | the only data route that never returns 401 |
+| `/api/items` | GET | list, grouped by category in the UI |
+| `/api/items/save` | POST | insert, or update when `id` is present |
+| `/api/items/delete/:id` | DELETE | numeric ids only, else 400 |
+| `/api/settings` | GET | current exchange rates |
+| `/api/settings/save` | POST | upsert into the single-row table |
+| `/api/price-calculator/calculate` | POST | pure arithmetic, no database |
+| `/api/price-calculator/save` | POST | store a Thailand quote |
+| `/api/price-calculator/quotes` | GET | **no caller yet** |
+| `/api/japan-quotes` | GET | **no caller yet** |
+| `/api/japan-quotes/save` | POST | store a Japan quote |
+| `/api/qr/save` | POST | store a generated code |
+| `/api/qr/history` | GET | list saved codes |
+| `/api/qr/history/:id` | DELETE | numeric ids only, else 400 |
+
+- **No database at all:** `health`, `auth/logout`, `auth/check`, `price-calculator/calculate`.
+  Note `auth/login` *does* hit Postgres, for the rate-limit counter — so a database outage blocks
+  signing in, not just reading data.
+- **Requires a valid session**, returning 401 without one: everything except `health` and
+  `auth/*`.
+
 ## Database and schema changes
 
 `ensureSchema()` in [`frontend/lib/db.js`](frontend/lib/db.js) runs chained
@@ -130,7 +173,7 @@ Supabase console.
 
 ## Pricing rules
 
-- **Thailand** (server-side, [`api/price-calculator/[action].js`](frontend/api/price-calculator/[action].js)):
+- **Thailand** (server-side, [`lib/routes/price-calculator.js`](frontend/lib/routes/price-calculator.js)):
   `(sum of item costs × 1.40) + delivery fee at cost`. Markup is 40%; delivery is never
   marked up. Optional digital website add-on: 800 THB standard, 2000 THB premium.
 - **Japan** (client-side only, [`src/PriceCalculator.tsx`](frontend/src/PriceCalculator.tsx)):
