@@ -20,6 +20,7 @@ const ROUTES = {
   auth: require('../lib/routes/auth'),
   items: require('../lib/routes/items'),
   settings: require('../lib/routes/settings'),
+  orders: require('../lib/routes/orders'),
   qr: require('../lib/routes/qr'),
   'price-calculator': require('../lib/routes/price-calculator'),
   'japan-quotes': require('../lib/routes/japan-quotes'),

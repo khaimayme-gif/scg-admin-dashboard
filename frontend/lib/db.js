@@ -72,7 +72,24 @@ function ensureSchema() {
         original_cost REAL,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`))
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        customer_name TEXT NOT NULL,
+        country TEXT NOT NULL,
+        order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        status TEXT NOT NULL DEFAULT 'pending',
+        currency TEXT NOT NULL DEFAULT 'THB',
+        revenue REAL NOT NULL DEFAULT 0,
+        cost REAL NOT NULL DEFAULT 0,
+        items_json TEXT NOT NULL DEFAULT '[]',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
       )
+    `)).then(() => pool.query(`
+      CREATE INDEX IF NOT EXISTS orders_order_date ON orders (order_date DESC)
     `)).then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,
