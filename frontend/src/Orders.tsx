@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { apiFetch, jsonBody } from './api';
 
 interface OrderItem {
@@ -92,7 +92,7 @@ export default function Orders() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-  const formRef = useRef<HTMLDivElement>(null);
+  const [showForm, setShowForm] = useState(false);
 
   const loadAll = () => {
     Promise.all([
@@ -183,12 +183,19 @@ export default function Orders() {
           : [{ name: '', quantity: '1' }],
       notes: order.notes ?? '',
     });
-    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setShowForm(true);
   };
 
-  const cancelEdit = () => {
+  const openNew = () => {
     setFormError('');
     setForm(emptyForm());
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setFormError('');
+    setForm(emptyForm());
+    setShowForm(false);
   };
 
   const handleSubmit = async () => {
@@ -224,6 +231,7 @@ export default function Orders() {
       setSaving(false);
     }
     setForm(emptyForm());
+    setShowForm(false);
     loadAll();
   };
 
@@ -234,7 +242,7 @@ export default function Orders() {
     } catch {
       return;
     }
-    if (form.id === order.id) setForm(emptyForm());
+    if (form.id === order.id) closeForm();
     loadAll();
   };
 
@@ -245,9 +253,12 @@ export default function Orders() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>Orders</h1>
-        <p className="page-subtitle">Every order So Chic Gifts has done, with revenue and cost.</p>
+      <header className="page-header page-header-row">
+        <div>
+          <h1>Orders</h1>
+          <p className="page-subtitle">Every order So Chic Gifts has done, with revenue and cost.</p>
+        </div>
+        <button className="new-order-btn" onClick={openNew}>+ New Order</button>
       </header>
 
       {loading ? (
@@ -287,8 +298,13 @@ export default function Orders() {
             </>
           )}
 
-          <div className="calc-panel" ref={formRef}>
-            <h2 className="panel-label">{form.id ? `Edit order #${form.id}` : 'Add new order'}</h2>
+          {showForm && (
+          <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h2 className="panel-label">{form.id ? `Edit order #${form.id}` : 'New order'}</h2>
+              <button className="item-remove" onClick={closeForm} aria-label="Close">×</button>
+            </div>
 
             <div className="order-form-grid">
               <div className="order-field">
@@ -440,11 +456,11 @@ export default function Orders() {
               <button className="save-btn" onClick={handleSubmit} disabled={saving}>
                 {saving ? 'Saving…' : form.id ? 'Update order' : 'Save order'}
               </button>
-              {form.id && (
-                <button className="add-item-btn" onClick={cancelEdit}>Cancel edit</button>
-              )}
+              <button className="add-item-btn" onClick={closeForm}>Cancel</button>
             </div>
           </div>
+          </div>
+          )}
 
           <div className="calc-panel">
             <h2 className="panel-label">All orders</h2>

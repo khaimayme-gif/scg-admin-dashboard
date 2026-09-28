@@ -486,3 +486,9 @@ html, body, #root {
 .order-profit { font-family: 'IBM Plex Mono', monospace; font-size: 15px; padding: 8px 0; }
 .order-edit-btn { background: none; border: none; color: var(--plum); cursor: pointer; font-size: 13px; }
 .order-edit-btn:hover { text-decoration: underline; }
+.page-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.new-order-btn { background: var(--forest-deep); color: var(--ivory); border: none; padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.new-order-btn:hover { opacity: 0.9; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(20, 24, 20, 0.45); z-index: 100; display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+.modal-card { background: #fff; border-radius: 10px; padding: 24px; width: 100%; max-width: 760px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
