@@ -4,17 +4,20 @@ import { apiFetch, jsonBody } from './api';
 interface OrderItem {
   name: string;
   quantity: number;
+  price?: number;
 }
 
 interface Order {
   id: number;
   customer_name: string;
   country: string;
+  channel: string | null;
   order_date: string;
   status: string;
   currency: string;
-  revenue: number;
+  selling_price: number;
   cost: number;
+  revenue: number;
   items: OrderItem[];
   notes: string | null;
 }
@@ -22,9 +25,9 @@ interface Order {
 interface Stats {
   orderCount: number;
   cancelledCount: number;
-  revenueThb: number;
+  sellingThb: number;
   costThb: number;
-  profitThb: number;
+  revenueThb: number;
   unconverted: number;
 }
 
@@ -38,17 +41,18 @@ interface CatalogItem {
 interface FormItem {
   name: string;
   quantity: string;
+  price: string;
 }
 
 interface FormState {
   id: number | null;
   customerName: string;
   country: string;
+  channel: string;
   orderDate: string;
   status: string;
   currency: string;
-  revenue: string;
-  cost: string;
+  sellingPrice: string;
   items: FormItem[];
   notes: string;
 }
@@ -62,6 +66,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const CURRENCIES = ['THB', 'JPY', 'MMK'];
+const CHANNELS: Record<string, string> = { tiktok: 'TikTok', facebook: 'Facebook' };
 const COMMON_COUNTRIES = ['Japan', 'Thailand', 'Myanmar'];
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
@@ -74,12 +79,12 @@ const emptyForm = (): FormState => ({
   id: null,
   customerName: '',
   country: '',
+  channel: 'tiktok',
   orderDate: todayLocal(),
   status: 'pending',
   currency: 'THB',
-  revenue: '',
-  cost: '',
-  items: [{ name: '', quantity: '1' }],
+  sellingPrice: '',
+  items: [{ name: '', quantity: '1', price: '' }],
   notes: '',
 });
 
@@ -129,7 +134,7 @@ export default function Orders() {
   };
 
   const addItemLine = () => {
-    setForm((prev) => ({ ...prev, items: [...prev.items, { name: '', quantity: '1' }] }));
+    setForm((prev) => ({ ...prev, items: [...prev.items, { name: '', quantity: '1', price: '' }] }));
   };
 
   const removeItemLine = (index: number) => {
@@ -139,31 +144,22 @@ export default function Orders() {
     }));
   };
 
-  // Adds up menu price and original cost from the Items catalog for every line that matches a
-  // catalog name. Catalog prices are in THB, so this switches the order currency to THB.
-  const suggestFromCatalog = () => {
-    let revenue = 0;
-    let cost = 0;
+  // Fills the price of every line that matches a catalog name with that item's original cost.
+  // Catalog costs are in THB, so this switches the order currency to THB.
+  const fillCostsFromCatalog = () => {
     let matched = 0;
-    for (const line of form.items) {
+    const nextItems = form.items.map((line) => {
       const found = catalog.find((c) => c.name.toLowerCase() === line.name.trim().toLowerCase());
-      if (!found) continue;
-      const qty = Number(line.quantity) || 1;
+      if (!found || found.original_cost === null) return line;
       matched += 1;
-      revenue += found.menu_price * qty;
-      cost += (found.original_cost ?? 0) * qty;
-    }
+      return { ...line, price: String(found.original_cost) };
+    });
     if (matched === 0) {
-      setFormError('No item names matched your Items catalog, so there is nothing to add up.');
+      setFormError('No item names matched a catalog item that has an original cost.');
       return;
     }
     setFormError('');
-    setForm((prev) => ({
-      ...prev,
-      currency: 'THB',
-      revenue: String(Math.round(revenue)),
-      cost: String(Math.round(cost)),
-    }));
+    setForm((prev) => ({ ...prev, currency: 'THB', items: nextItems }));
   };
 
   const startEdit = (order: Order) => {
@@ -172,15 +168,15 @@ export default function Orders() {
       id: order.id,
       customerName: order.customer_name,
       country: order.country,
+      channel: order.channel ?? 'tiktok',
       orderDate: order.order_date,
       status: order.status,
       currency: order.currency,
-      revenue: String(order.revenue),
-      cost: String(order.cost),
+      sellingPrice: String(order.selling_price ?? 0),
       items:
         order.items.length > 0
-          ? order.items.map((i) => ({ name: i.name, quantity: String(i.quantity) }))
-          : [{ name: '', quantity: '1' }],
+          ? order.items.map((i) => ({ name: i.name, quantity: String(i.quantity), price: String(i.price ?? 0) }))
+          : [{ name: '', quantity: '1', price: '' }],
       notes: order.notes ?? '',
     });
     setShowForm(true);
@@ -210,14 +206,18 @@ export default function Orders() {
         id: form.id ?? undefined,
         customerName: form.customerName,
         country: form.country,
+        channel: form.channel,
         orderDate: form.orderDate,
         status: form.status,
         currency: form.currency,
-        revenue: Number(form.revenue || 0),
-        cost: Number(form.cost || 0),
+        sellingPrice: Number(form.sellingPrice || 0),
         items: form.items
           .filter((it) => it.name.trim())
-          .map((it) => ({ name: it.name.trim(), quantity: Number(it.quantity) || 1 })),
+          .map((it) => ({
+            name: it.name.trim(),
+            quantity: Number(it.quantity) || 1,
+            price: Number(it.price) || 0,
+          })),
         notes: form.notes.trim(),
       }));
       if (!res.ok) {
@@ -247,16 +247,21 @@ export default function Orders() {
   };
 
   const itemsSummary = (items: OrderItem[]) =>
-    items.length === 0 ? '—' : items.map((i) => `${i.quantity}x ${i.name}`).join(', ');
+    items.length === 0 ? '—' : items.map((i) => `${i.quantity}x ${i.name}${i.price ? ` (${fmt(i.price)})` : ''}`).join(', ');
 
-  const formProfit = Number(form.revenue || 0) - Number(form.cost || 0);
+  // Cost is the sum of the item prices. Revenue is what the customer paid minus that cost.
+  const formCost = form.items.reduce(
+    (sum, it) => (it.name.trim() ? sum + (Number(it.price) || 0) * (Number(it.quantity) || 1) : sum),
+    0
+  );
+  const formRevenue = Number(form.sellingPrice || 0) - formCost;
 
   return (
     <div className="page">
       <header className="page-header page-header-row">
         <div>
           <h1>Orders</h1>
-          <p className="page-subtitle">Every order So Chic Gifts has done, with revenue and cost.</p>
+          <p className="page-subtitle">Every order So Chic Gifts has done, with selling price, cost and revenue.</p>
         </div>
         <button className="new-order-btn" onClick={openNew}>+ New Order</button>
       </header>
@@ -276,18 +281,20 @@ export default function Orders() {
                   )}
                 </div>
                 <div className="stat-card">
-                  <span className="stat-label">Revenue</span>
-                  <span className="stat-value">{fmt(stats.revenueThb)} THB</span>
+                  <span className="stat-label">Collected</span>
+                  <span className="stat-value">{fmt(stats.sellingThb)} THB</span>
+                  <span className="stat-sub">Selling price total</span>
                 </div>
                 <div className="stat-card">
                   <span className="stat-label">Cost</span>
                   <span className="stat-value">{fmt(stats.costThb)} THB</span>
                 </div>
                 <div className="stat-card">
-                  <span className="stat-label">Profit</span>
-                  <span className={`stat-value ${stats.profitThb < 0 ? 'profit-negative' : ''}`}>
-                    {fmt(stats.profitThb)} THB
+                  <span className="stat-label">Revenue</span>
+                  <span className={`stat-value ${stats.revenueThb < 0 ? 'profit-negative' : ''}`}>
+                    {fmt(stats.revenueThb)} THB
                   </span>
+                  <span className="stat-sub">Collected minus cost</span>
                 </div>
               </div>
               {stats.unconverted > 0 && (
@@ -334,6 +341,18 @@ export default function Orders() {
                 </datalist>
               </div>
               <div className="order-field">
+                <label>Channel</label>
+                <select
+                  className="item-input"
+                  value={form.channel}
+                  onChange={(e) => update('channel', e.target.value)}
+                >
+                  {Object.entries(CHANNELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="order-field">
                 <label>Order date</label>
                 <input
                   type="date"
@@ -370,7 +389,7 @@ export default function Orders() {
                     className="item-input"
                     style={{ flex: 1 }}
                     list="order-catalog-items"
-                    placeholder="Item name (pick from catalog or type your own)"
+                    placeholder="Item name (from catalog or your own)"
                     value={line.name}
                     onChange={(e) => updateItem(index, 'name', e.target.value)}
                   />
@@ -381,6 +400,15 @@ export default function Orders() {
                     value={line.quantity}
                     onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                     aria-label="Quantity"
+                  />
+                  <input
+                    type="number"
+                    className="item-input order-item-price"
+                    min="0"
+                    placeholder={`Price (${form.currency})`}
+                    value={line.price}
+                    onChange={(e) => updateItem(index, 'price', e.target.value)}
+                    aria-label="Item price"
                   />
                   <button
                     className="item-remove"
@@ -395,7 +423,7 @@ export default function Orders() {
             </div>
             <div className="order-form-actions">
               <button className="add-item-btn" onClick={addItemLine}>+ Add item</button>
-              <button className="add-item-btn" onClick={suggestFromCatalog}>Fill revenue and cost from catalog (THB)</button>
+              <button className="add-item-btn" onClick={fillCostsFromCatalog}>Fill item prices from catalog costs (THB)</button>
             </div>
 
             <h3 className="order-subheading">Money</h3>
@@ -413,29 +441,23 @@ export default function Orders() {
                 </select>
               </div>
               <div className="order-field">
-                <label>Revenue (what the customer paid)</label>
+                <label>Selling price (what the customer paid)</label>
                 <input
                   type="number"
                   className="item-input"
                   min="0"
-                  value={form.revenue}
-                  onChange={(e) => update('revenue', e.target.value)}
+                  value={form.sellingPrice}
+                  onChange={(e) => update('sellingPrice', e.target.value)}
                 />
               </div>
               <div className="order-field">
-                <label>Cost (what it cost you)</label>
-                <input
-                  type="number"
-                  className="item-input"
-                  min="0"
-                  value={form.cost}
-                  onChange={(e) => update('cost', e.target.value)}
-                />
+                <label>Cost (sum of item prices)</label>
+                <div className="order-profit">{fmt(formCost)} {form.currency}</div>
               </div>
               <div className="order-field">
-                <label>Profit</label>
-                <div className={`order-profit ${formProfit < 0 ? 'profit-negative' : ''}`}>
-                  {fmt(formProfit)} {form.currency}
+                <label>Revenue (selling price minus cost)</label>
+                <div className={`order-profit ${formRevenue < 0 ? 'profit-negative' : ''}`}>
+                  {fmt(formRevenue)} {form.currency}
                 </div>
               </div>
             </div>
@@ -474,33 +496,34 @@ export default function Orders() {
                       <th>Date</th>
                       <th>Customer</th>
                       <th>Country</th>
+                      <th>Channel</th>
                       <th>Items</th>
                       <th>Status</th>
-                      <th>Revenue</th>
+                      <th>Selling price</th>
                       <th>Cost</th>
-                      <th>Profit</th>
+                      <th>Revenue</th>
                       <th></th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {orders.map((o) => {
-                      const profit = o.revenue - o.cost;
                       return (
                         <tr key={o.id}>
                           <td>{o.order_date}</td>
                           <td>{o.customer_name}</td>
                           <td>{o.country}</td>
+                          <td>{o.channel ? (CHANNELS[o.channel] ?? o.channel) : '—'}</td>
                           <td>{itemsSummary(o.items)}</td>
                           <td>
                             <span className={`status-pill status-${o.status}`}>
                               {STATUS_LABELS[o.status] ?? o.status}
                             </span>
                           </td>
-                          <td className="items-price-cell">{fmt(o.revenue)} {o.currency}</td>
+                          <td className="items-price-cell">{fmt(o.selling_price)} {o.currency}</td>
                           <td className="items-price-cell">{fmt(o.cost)} {o.currency}</td>
-                          <td className={`items-price-cell ${profit < 0 ? 'profit-negative' : ''}`}>
-                            {fmt(profit)} {o.currency}
+                          <td className={`items-price-cell ${o.revenue < 0 ? 'profit-negative' : ''}`}>
+                            {fmt(o.revenue)} {o.currency}
                           </td>
                           <td>
                             <button className="order-edit-btn" onClick={() => startEdit(o)}>Edit</button>

@@ -492,3 +492,4 @@ html, body, #root {
 .modal-backdrop { position: fixed; inset: 0; background: rgba(20, 24, 20, 0.45); z-index: 100; display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
 .modal-card { background: #fff; border-radius: 10px; padding: 24px; width: 100%; max-width: 760px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.order-item-price { width: 130px; }

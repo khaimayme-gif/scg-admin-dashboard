@@ -90,7 +90,16 @@ function ensureSchema() {
       )
     `)).then(() => pool.query(`
       CREATE INDEX IF NOT EXISTS orders_order_date ON orders (order_date DESC)
+    `))
+    .then(() => pool.query(`
+      ALTER TABLE orders
+        ADD COLUMN IF NOT EXISTS channel TEXT,
+        ADD COLUMN IF NOT EXISTS selling_price REAL
     `)).then(() => pool.query(`
+      UPDATE orders SET selling_price = revenue, revenue = revenue - cost
+      WHERE selling_price IS NULL
+    `))
+    .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,
         ip TEXT NOT NULL,
