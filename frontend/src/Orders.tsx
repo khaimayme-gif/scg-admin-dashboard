@@ -22,12 +22,21 @@ interface Order {
   notes: string | null;
 }
 
-interface Stats {
+interface Totals {
   orderCount: number;
-  cancelledCount: number;
   sellingThb: number;
   costThb: number;
   revenueThb: number;
+}
+
+interface MonthStats extends Totals {
+  month: string; // YYYY-MM
+  cancelledCount: number;
+}
+
+interface Stats extends Totals {
+  cancelledCount: number;
+  monthly: MonthStats[];
   unconverted: number;
 }
 
@@ -75,6 +84,39 @@ const fmt = (n: number) => Math.round(n).toLocaleString();
 // that toISOString() causes early in the morning in Thailand (UTC+7).
 const todayLocal = () => new Date().toLocaleDateString('en-CA');
 
+const monthLabel = (ym: string) => {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+};
+
+function StatCards({ totals, cancelledCount }: { totals: Totals; cancelledCount: number }) {
+  return (
+    <div className="stat-grid">
+      <div className="stat-card">
+        <span className="stat-label">Total orders</span>
+        <span className="stat-value">{totals.orderCount}</span>
+        {cancelledCount > 0 && <span className="stat-sub">{cancelledCount} cancelled, not counted</span>}
+      </div>
+      <div className="stat-card">
+        <span className="stat-label">Collected</span>
+        <span className="stat-value">{fmt(totals.sellingThb)} THB</span>
+        <span className="stat-sub">Selling price total</span>
+      </div>
+      <div className="stat-card">
+        <span className="stat-label">Cost</span>
+        <span className="stat-value">{fmt(totals.costThb)} THB</span>
+      </div>
+      <div className="stat-card">
+        <span className="stat-label">Revenue</span>
+        <span className={`stat-value ${totals.revenueThb < 0 ? 'profit-negative' : ''}`}>
+          {fmt(totals.revenueThb)} THB
+        </span>
+        <span className="stat-sub">Collected minus cost</span>
+      </div>
+    </div>
+  );
+}
+
 const emptyForm = (): FormState => ({
   id: null,
   customerName: '',
@@ -98,6 +140,7 @@ export default function Orders() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(todayLocal().slice(0, 7));
 
   const loadAll = () => {
     Promise.all([
@@ -256,6 +299,14 @@ export default function Orders() {
   );
   const formRevenue = Number(form.sellingPrice || 0) - formCost;
 
+  // Every month that has orders, plus the current month so it is always selectable.
+  const monthOptions = Array.from(
+    new Set([todayLocal().slice(0, 7), selectedMonth, ...(stats?.monthly ?? []).map((m) => m.month)])
+  ).sort((a, b) => b.localeCompare(a));
+  const monthTotals: MonthStats = stats?.monthly.find((m) => m.month === selectedMonth) ?? {
+    month: selectedMonth, orderCount: 0, cancelledCount: 0, sellingThb: 0, costThb: 0, revenueThb: 0,
+  };
+
   return (
     <div className="page">
       <header className="page-header page-header-row">
@@ -272,31 +323,22 @@ export default function Orders() {
         <>
           {stats && (
             <>
-              <div className="stat-grid">
-                <div className="stat-card">
-                  <span className="stat-label">Total orders</span>
-                  <span className="stat-value">{stats.orderCount}</span>
-                  {stats.cancelledCount > 0 && (
-                    <span className="stat-sub">{stats.cancelledCount} cancelled, not counted</span>
-                  )}
-                </div>
-                <div className="stat-card">
-                  <span className="stat-label">Collected</span>
-                  <span className="stat-value">{fmt(stats.sellingThb)} THB</span>
-                  <span className="stat-sub">Selling price total</span>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-label">Cost</span>
-                  <span className="stat-value">{fmt(stats.costThb)} THB</span>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-label">Revenue</span>
-                  <span className={`stat-value ${stats.revenueThb < 0 ? 'profit-negative' : ''}`}>
-                    {fmt(stats.revenueThb)} THB
-                  </span>
-                  <span className="stat-sub">Collected minus cost</span>
-                </div>
+              <h2 className="section-title">All time</h2>
+              <StatCards totals={stats} cancelledCount={stats.cancelledCount} />
+
+              <div className="section-title-row">
+                <h2 className="section-title">Monthly</h2>
+                <select
+                  className="item-input month-select"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                >
+                  {monthOptions.map((ym) => (
+                    <option key={ym} value={ym}>{monthLabel(ym)}</option>
+                  ))}
+                </select>
               </div>
+              <StatCards totals={monthTotals} cancelledCount={monthTotals.cancelledCount} />
               {stats.unconverted > 0 && (
                 <p className="error-text">
                   {stats.unconverted} order(s) are left out of the totals because an exchange rate is missing in Settings.

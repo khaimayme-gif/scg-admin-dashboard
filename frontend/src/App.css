@@ -493,3 +493,7 @@ html, body, #root {
 .modal-card { background: #fff; border-radius: 10px; padding: 24px; width: 100%; max-width: 760px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .order-item-price { width: 130px; }
+.section-title { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; color: var(--forest-deep); margin: 0 0 10px; }
+.section-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; margin-bottom: 10px; }
+.section-title-row .section-title { margin: 0; }
+.month-select { width: auto; min-width: 170px; }

@@ -30,7 +30,11 @@ module.exports = async (req, res, [first, second]) => {
 
   if (first === 'stats' && req.method === 'GET') {
     const [ordersResult, settingsResult] = await Promise.all([
-      pool.query('SELECT status, currency, selling_price, cost, revenue FROM orders'),
+      pool.query(
+        `SELECT status, currency, selling_price, cost, revenue,
+                to_char(order_date, 'YYYY-MM') AS month
+         FROM orders`
+      ),
       pool.query('SELECT * FROM settings WHERE id = 1'),
     ]);
     const s = settingsResult.rows[0] || {};
@@ -42,13 +46,19 @@ module.exports = async (req, res, [first, second]) => {
     let orderCount = 0;
     let cancelledCount = 0;
     let unconverted = 0;
+    const byMonth = {}; // 'YYYY-MM' -> totals for that month, in THB
 
     for (const row of ordersResult.rows) {
+      const m = (byMonth[row.month] = byMonth[row.month] || {
+        month: row.month, orderCount: 0, cancelledCount: 0, sellingThb: 0, costThb: 0, revenueThb: 0,
+      });
       if (row.status === 'cancelled') {
         cancelledCount += 1;
+        m.cancelledCount += 1;
         continue;
       }
       orderCount += 1;
+      m.orderCount += 1;
       const sell = toThb(Number(row.selling_price), row.currency, rates);
       const cst = toThb(Number(row.cost), row.currency, rates);
       const rev = toThb(Number(row.revenue), row.currency, rates);
@@ -59,7 +69,19 @@ module.exports = async (req, res, [first, second]) => {
       sellingThb += sell;
       costThb += cst;
       revenueThb += rev;
+      m.sellingThb += sell;
+      m.costThb += cst;
+      m.revenueThb += rev;
     }
+
+    const monthly = Object.values(byMonth)
+      .sort((a, b) => b.month.localeCompare(a.month))
+      .map((m) => ({
+        ...m,
+        sellingThb: Math.round(m.sellingThb),
+        costThb: Math.round(m.costThb),
+        revenueThb: Math.round(m.revenueThb),
+      }));
 
     return res.status(200).json({
       orderCount,
@@ -67,6 +89,7 @@ module.exports = async (req, res, [first, second]) => {
       sellingThb: Math.round(sellingThb),
       costThb: Math.round(costThb),
       revenueThb: Math.round(revenueThb),
+      monthly, // one entry per month that has orders, newest first
       unconverted, // orders skipped because the exchange rate is missing in Settings
     });
   }
