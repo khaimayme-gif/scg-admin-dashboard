@@ -475,3 +475,14 @@ html, body, #root {
 .status-in_progress { background: #F3EAD3; color: #7A5A12; }
 .status-delivered { background: #DDE9EE; color: #24506A; }
 .status-cancelled { background: #F3DEDA; color: #8A2F22; }
+.order-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.order-field { display: flex; flex-direction: column; gap: 4px; }
+.order-field label { font-size: 12px; color: #8A887F; }
+.order-field .item-input { width: 100%; }
+.order-subheading { font-size: 13px; font-weight: 600; color: var(--forest-deep); margin: 8px 0; }
+.order-item-lines { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.order-item-qty { width: 70px; }
+.order-form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.order-profit { font-family: 'IBM Plex Mono', monospace; font-size: 15px; padding: 8px 0; }
+.order-edit-btn { background: none; border: none; color: var(--plum); cursor: pointer; font-size: 13px; }
+.order-edit-btn:hover { text-decoration: underline; }
