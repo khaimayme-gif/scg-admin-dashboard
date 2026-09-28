@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { setUnauthorizedHandler } from './api';
 import Sidebar from './Sidebar';
-import PriceCalculator from './PriceCalculator';
+import Quotation from './Quotation'; 
 import QRCodeGenerator from './QRCodeGenerator';
 import Login from './Login';
 import './App.css';
@@ -12,7 +12,7 @@ import Orders from './Orders';
 const API_BASE = '/api';
 
 export default function App() {
-  const [active, setActive] = useState('price-calculator');
+  const [active, setActive] = useState('quotation'); 
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
@@ -48,7 +48,7 @@ export default function App() {
     <div className="app-shell">
       <Sidebar active={active} onSelect={setActive} onLogout={handleLogout} />
       <main className="app-content">
-        {active === 'price-calculator' && <PriceCalculator />}
+        {active === 'quotation' && <Quotation />} 
         {active === 'qr' && <QRCodeGenerator />}
         {active === 'settings' && <Settings />}
         {active === 'items' && <Items />}

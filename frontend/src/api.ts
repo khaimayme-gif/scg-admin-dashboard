@@ -1,19 +1,5 @@
 const API_BASE = '/api';
 
-export interface PriceItem {
-  id: string;
-  name: string;
-  cost: number;
-}
-
-export interface CalculationResult {
-  itemsCost: number;
-  markupPercent: number;
-  markedUpItemsCost: number;
-  deliveryFee: number;
-  total: number;
-}
-
 export class UnauthorizedError extends Error {
   constructor() {
     super('Session expired');
@@ -51,22 +37,6 @@ function jsonBody(body: unknown): RequestInit {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   };
-}
-
-export function calculatePrice(items: PriceItem[], deliveryFee: number): Promise<CalculationResult> {
-  return apiJson<CalculationResult>('/price-calculator/calculate', jsonBody({
-    items: items.map(({ name, cost }) => ({ name, cost })),
-    deliveryFee,
-  }));
-}
-
-export function saveQuote(items: PriceItem[], result: CalculationResult): Promise<{ id: number }> {
-  return apiJson<{ id: number }>('/price-calculator/save', jsonBody({
-    items: items.map(({ name, cost }) => ({ name, cost })),
-    markupPercent: result.markupPercent,
-    deliveryFee: result.deliveryFee,
-    total: result.total,
-  }));
 }
 
 export { apiJson, jsonBody };

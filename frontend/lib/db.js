@@ -100,6 +100,24 @@ function ensureSchema() {
       WHERE selling_price IS NULL
     `))
     .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS quotations (
+        id SERIAL PRIMARY KEY,
+        customer_name TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        quote_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        order_place TEXT NOT NULL,
+        items_json TEXT NOT NULL DEFAULT '[]',
+        total_thb REAL NOT NULL DEFAULT 0,
+        original_thb REAL NOT NULL DEFAULT 0,
+        revenue_thb REAL NOT NULL DEFAULT 0,
+        total_mmk REAL,
+        total_jpy REAL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `)).then(() => pool.query(`
+      CREATE INDEX IF NOT EXISTS quotations_created_at ON quotations (created_at DESC)
+    `))
+    .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,
         ip TEXT NOT NULL,

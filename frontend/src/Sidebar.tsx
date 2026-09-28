@@ -5,7 +5,7 @@ interface SidebarProps {
 }
 
 const MODULES = [
-  { id: 'price-calculator', label: 'Price Calculator', ready: true },
+    { id: 'quotation', label: 'Quotation', ready: true },
   { id: 'items', label: 'Items', ready: true },
   { id: 'qr', label: 'QR Code Generator', ready: true },
   { id: 'orders', label: 'Orders', ready: true },
