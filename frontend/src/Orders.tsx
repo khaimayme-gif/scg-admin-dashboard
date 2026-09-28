@@ -141,6 +141,7 @@ export default function Orders() {
   const [formError, setFormError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(todayLocal().slice(0, 7));
+  const [view, setView] = useState<'monthly' | 'all'>('monthly');
 
   const loadAll = () => {
     Promise.all([
@@ -323,22 +324,38 @@ export default function Orders() {
         <>
           {stats && (
             <>
-              <h2 className="section-title">All time</h2>
-              <StatCards totals={stats} cancelledCount={stats.cancelledCount} />
-
               <div className="section-title-row">
-                <h2 className="section-title">Monthly</h2>
-                <select
-                  className="item-input month-select"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                  {monthOptions.map((ym) => (
-                    <option key={ym} value={ym}>{monthLabel(ym)}</option>
-                  ))}
-                </select>
+                <div className="view-toggle">
+                  <button
+                    className={`view-toggle-btn ${view === 'monthly' ? 'is-active' : ''}`}
+                    onClick={() => setView('monthly')}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    className={`view-toggle-btn ${view === 'all' ? 'is-active' : ''}`}
+                    onClick={() => setView('all')}
+                  >
+                    All
+                  </button>
+                </div>
+                {view === 'monthly' && (
+                  <select
+                    className="item-input month-select"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                  >
+                    {monthOptions.map((ym) => (
+                      <option key={ym} value={ym}>{monthLabel(ym)}</option>
+                    ))}
+                  </select>
+                )}
               </div>
-              <StatCards totals={monthTotals} cancelledCount={monthTotals.cancelledCount} />
+              {view === 'monthly' ? (
+                <StatCards totals={monthTotals} cancelledCount={monthTotals.cancelledCount} />
+              ) : (
+                <StatCards totals={stats} cancelledCount={stats.cancelledCount} />
+              )}
               {stats.unconverted > 0 && (
                 <p className="error-text">
                   {stats.unconverted} order(s) are left out of the totals because an exchange rate is missing in Settings.
