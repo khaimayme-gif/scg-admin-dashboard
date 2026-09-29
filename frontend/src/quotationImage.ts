@@ -13,6 +13,7 @@ export interface QuotationImageData {
   quoteNo: string; // e.g. 20260928-001
   quoteDate: string; // YYYY-MM-DD
   items: { name: string; sellingPrice: number }[];
+  totalMmk?: number | null; // shown as "≈ X MMK" under the total, when a rate was available
 }
 
 const FONT = "'Inter', 'Noto Sans Myanmar', sans-serif";
@@ -174,6 +175,14 @@ export async function renderQuotationPng(data: QuotationImageData): Promise<Blob
   ctx.fillStyle = PINK;
   ctx.font = `700 ${ROW_SIZE}px ${FONT}`;
   ctx.fillText(`${fmt(total)} ฿`, TEXT_R, totalY);
+
+  // MMK equivalent, shown only if a rate was available when the quotation was made.
+  if (data.totalMmk) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = GRAY;
+    ctx.font = `400 24px ${FONT}`;
+    ctx.fillText(`≈ ${fmt(data.totalMmk)} MMK`, TEXT_R, totalY + 34);
+  }
 
   // Footer.
   ctx.textAlign = 'center';

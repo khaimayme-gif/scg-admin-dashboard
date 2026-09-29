@@ -170,6 +170,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
         quoteNo: q.quote_no,
         quoteDate: q.quote_date,
         items: q.items.map((it) => ({ name: it.name, sellingPrice: it.sellingPrice })),
+        totalMmk: q.total_mmk,
       });
       downloadBlob(blob, `SCG-Quotation-${q.quote_no}.png`);
     } catch {
