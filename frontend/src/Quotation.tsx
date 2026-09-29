@@ -53,10 +53,13 @@ export default function Quotation() {
 
   const [rates, setRates] = useState<Rates | null>(null);
   const [history, setHistory] = useState<Quotation[]>([]);
-  const [saved, setSaved] = useState<Quotation | null>(null);
+  const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  // The newest saved quotation, shown as a card. history is sorted newest-first by the server.
+  const lastQuotation = history[0] ?? null;
 
   const loadHistory = () => {
     apiFetch('/quotations')
@@ -121,7 +124,8 @@ export default function Quotation() {
         setError(data.error || 'Could not save the quotation.');
         return;
       }
-      setSaved(await res.json());
+      await res.json();
+      setShowForm(false);
       loadHistory();
     } catch {
       // a 401 has already sent us back to login
@@ -131,7 +135,7 @@ export default function Quotation() {
   };
 
   const startNew = () => {
-    setSaved(null);
+    setShowForm(true);
     setCustomerName('');
     setChannel('tiktok');
     setQuoteDate(todayLocal());
@@ -147,7 +151,6 @@ export default function Quotation() {
     } catch {
       return;
     }
-    if (saved?.id === q.id) setSaved(null);
     loadHistory();
   };
 
@@ -177,37 +180,48 @@ export default function Quotation() {
         <p className="page-subtitle">Get a quotation for a customer, then turn it into an order.</p>
       </header>
 
-      {saved ? (
+      {!showForm && (
+        <div className="order-form-actions">
+          <button className="save-btn" onClick={startNew}>Get Quotation</button>
+        </div>
+      )}
+
+      {!showForm && lastQuotation && (
         <div className="calc-panel">
-          <h2 className="panel-label">Quotation ready</h2>
+          <h2 className="panel-label">Last quotation</h2>
           <div className="quote-summary">
-            <p><strong>{saved.customer_name}</strong></p>
-            <p>Quotation ID: {saved.quote_no}</p>
-            <p>Channel: {CHANNELS[saved.channel] ?? saved.channel}</p>
-            <p>Date: {saved.quote_date}</p>
-            <p>Order place: {saved.order_place}</p>
+            <p><strong>{lastQuotation.customer_name}</strong></p>
+            <p>Quotation ID: {lastQuotation.quote_no}</p>
+            <p>Channel: {CHANNELS[lastQuotation.channel] ?? lastQuotation.channel}</p>
+            <p>Date: {lastQuotation.quote_date}</p>
+            <p>Order place: {lastQuotation.order_place}</p>
             <ol className="quote-lines">
-              {saved.items.map((it, i) => (
+              {lastQuotation.items.map((it, i) => (
                 <li key={i}>{it.name}: {fmt(it.sellingPrice)} THB</li>
               ))}
             </ol>
             <p className="quote-total">
-              Quotation is {fmt(saved.total_thb)} THB in total.
+              Quotation is {fmt(lastQuotation.total_thb)} THB in total.
               <br />
-              ({amountLine(saved.total_mmk, saved.total_jpy)})
+              ({amountLine(lastQuotation.total_mmk, lastQuotation.total_jpy)})
             </p>
           </div>
           <p className="stat-sub">
-            Revenue {fmt(saved.revenue_thb)} THB, for you only, never shown to the customer.
+            Revenue {fmt(lastQuotation.revenue_thb)} THB, for you only, never shown to the customer.
           </p>
           <div className="order-form-actions">
-            <button className="save-btn" onClick={() => handleDownload(saved)} disabled={downloadingId === saved.id}>
-              {downloadingId === saved.id ? 'Preparing…' : 'Download quotation'}
+            <button
+              className="save-btn"
+              onClick={() => handleDownload(lastQuotation)}
+              disabled={downloadingId === lastQuotation.id}
+            >
+              {downloadingId === lastQuotation.id ? 'Preparing…' : 'Download quotation'}
             </button>
-            <button className="add-item-btn" onClick={startNew}>New quotation</button>
           </div>
         </div>
-      ) : (
+      )}
+
+      {showForm && (
         <div className="calc-panel">
           <h2 className="panel-label">Get Quotation</h2>
 
@@ -318,6 +332,9 @@ export default function Quotation() {
           <div className="order-form-actions">
             <button className="save-btn" onClick={handleSubmit} disabled={saving}>
               {saving ? 'Saving…' : 'Get quotation'}
+            </button>
+            <button className="add-item-btn" onClick={() => setShowForm(false)} disabled={saving}>
+              Cancel
             </button>
           </div>
         </div>
