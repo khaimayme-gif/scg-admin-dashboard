@@ -45,7 +45,14 @@ function ensureSchema() {
         theme TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
-    `)).then(() => pool.query(`
+    `))
+    .then(() => pool.query(`
+      ALTER TABLE qr_codes
+        ADD COLUMN IF NOT EXISTS card_theme TEXT,
+        ADD COLUMN IF NOT EXISTS dot_color TEXT,
+        ADD COLUMN IF NOT EXISTS show_handle BOOLEAN NOT NULL DEFAULT false
+    `))
+    .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS japan_quotes (
         id SERIAL PRIMARY KEY,
         gift_cost REAL NOT NULL,

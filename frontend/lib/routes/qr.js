@@ -5,11 +5,12 @@ module.exports = async (req, res, [first, second]) => {
   if (first === 'save' && req.method === 'POST') {
     if (!requireAuth(req, res)) return;
     await ensureSchema();
-    const { url, label, theme } = req.body || {};
+    const { url, label, cardTheme, dotColor, showHandle } = req.body || {};
     if (!url || !url.trim()) return res.status(400).json({ error: 'url is required' });
     const result = await pool.query(
-      'INSERT INTO qr_codes (url, label, theme) VALUES ($1, $2, $3) RETURNING id',
-      [url, label || null, theme || null]
+      `INSERT INTO qr_codes (url, label, card_theme, dot_color, show_handle)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [url, label || null, cardTheme || null, dotColor || null, !!showHandle]
     );
     return res.status(200).json({ id: result.rows[0].id });
   }

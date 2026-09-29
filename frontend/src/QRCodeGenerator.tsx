@@ -2,37 +2,137 @@ import { useState, useEffect, useRef } from 'react';
 import QRCodeStyling from 'qr-code-styling';
 import { apiFetch, jsonBody } from './api';
 import sochicLogo from './assets/sochic-logo.png';
+import bowUrl from './assets/quotation-bow.png';
 
-type ThemeId = 'blossom' | 'rosegold' | 'sage' | 'classic';
+type CardTheme = 'polka' | 'white' | 'bow';
+type DotColor = 'white' | 'black' | 'pink';
 
-const THEMES: Record<ThemeId, { label: string; dotColor: string; swatch: string }> = {
-  blossom: { label: 'Blossom Pink', dotColor: '#E8699E', swatch: '#E8699E' },
-  rosegold: { label: 'Rose Gold', dotColor: '#9B5A45', swatch: '#B5735A' },
-  sage: { label: 'Sage Forest', dotColor: '#33453B', swatch: '#33453B' },
-  classic: { label: 'Classic Black', dotColor: '#1A1A1A', swatch: '#1A1A1A' },
+// Brand colors, matching the Quotation PNG template so every export looks like one family.
+const BG = '#fffafc';
+const DOT = '#ffdeeb';
+const PINK = '#da7282';
+
+const CARD_THEMES: Record<CardTheme, string> = {
+  polka: 'Polka Dot',
+  white: 'White',
+  bow: 'Bow',
+};
+
+const DOT_COLORS: Record<DotColor, { label: string; hex: string }> = {
+  white: { label: 'White', hex: '#FFFFFF' },
+  black: { label: 'Black', hex: '#1A1A1A' },
+  pink: { label: 'Pink', hex: PINK },
 };
 
 const BRAND_HANDLE = '@sochicgifts';
 
-// Card layout constants (all in px, shared between the on-screen preview and the download composite).
-// This is "Theme 1": a dotted pink background behind a white rounded card, with the brand handle
-// printed below the card. No banner, no corner brackets.
-const CARD_FRAME_WIDTH = 400;
-const CARD_MARGIN = 24; // gap between the outer edge and the white card, on the top/left/right
-const CARD_SIZE = CARD_FRAME_WIDTH - CARD_MARGIN * 2;
+// Every theme renders onto the same square canvas, so preview and download always match exactly.
+const FRAME_SIZE = 400;
+const MARGIN = 24;
+const INNER = FRAME_SIZE - MARGIN * 2; // the square area themes decorate, before the caption strip
+const CAPTION_HEIGHT = 64;
+const CARD_QR_PADDING = 36; // polka / white: gap between the square's edge and the QR
 const CARD_RADIUS = 32;
-const CARD_QR_PADDING = 36; // gap between the card edge and the QR code inside it
-const FRAMED_QR_SIZE = CARD_SIZE - CARD_QR_PADDING * 2;
-const FRAMED_QR_OFFSET_X = CARD_MARGIN + CARD_QR_PADDING;
-const FRAMED_QR_OFFSET_Y = CARD_MARGIN + CARD_QR_PADDING;
-const CAPTION_HEIGHT = 64; // space below the card for the @sochicgifts handle
-const FRAME_WIDTH = CARD_FRAME_WIDTH;
-const FRAME_HEIGHT = CARD_MARGIN + CARD_SIZE + CARD_MARGIN + CAPTION_HEIGHT;
-const PLAIN_QR_SIZE = 300;
-const CARD_CAPTION_COLOR = '#C9698C'; // dusty rose, independent of the QR dot-color theme below
+const BOW_WIDTH = 180;
+const BOW_HEIGHT = (BOW_WIDTH * 213) / 393; // the source bow image is 393x213
+const BOW_GAP = 16; // bow: gap between the bow image and the QR below it
 
-function buildQrOptions(theme: ThemeId, data: string, size: number) {
-  const color = THEMES[theme].dotColor;
+interface Layout {
+  width: number;
+  height: number;
+  qrX: number;
+  qrY: number;
+  qrSize: number;
+  bow?: { x: number; y: number; w: number; h: number };
+  card?: { x: number; y: number; w: number; h: number };
+}
+
+function getLayout(theme: CardTheme, showHandle: boolean): Layout {
+  const height = MARGIN + INNER + MARGIN + (showHandle ? CAPTION_HEIGHT : 0);
+  if (theme === 'bow') {
+    const qrSize = INNER - BOW_HEIGHT - BOW_GAP;
+    return {
+      width: FRAME_SIZE,
+      height,
+      qrX: MARGIN + (INNER - qrSize) / 2,
+      qrY: MARGIN + BOW_HEIGHT + BOW_GAP,
+      qrSize,
+      bow: { x: MARGIN + (INNER - BOW_WIDTH) / 2, y: MARGIN, w: BOW_WIDTH, h: BOW_HEIGHT },
+    };
+  }
+  const qrSize = INNER - CARD_QR_PADDING * 2;
+  return {
+    width: FRAME_SIZE,
+    height,
+    qrX: MARGIN + CARD_QR_PADDING,
+    qrY: MARGIN + CARD_QR_PADDING,
+    qrSize,
+    card: theme === 'polka' ? { x: MARGIN, y: MARGIN, w: INNER, h: INNER } : undefined,
+  };
+}
+
+const roundRectPath = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+};
+
+// Draws everything except the QR itself: the background, the polka dots or bow, the white card,
+// and the optional @sochicgifts caption. The live QR canvas from qr-code-styling is layered on
+// top separately, at the position getLayout() returns, both on screen and when exporting.
+function drawBackground(
+  ctx: CanvasRenderingContext2D,
+  theme: CardTheme,
+  showHandle: boolean,
+  layout: Layout,
+  bowImg: HTMLImageElement | null
+) {
+  ctx.clearRect(0, 0, layout.width, layout.height);
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, layout.width, layout.height);
+
+  if (theme === 'polka') {
+    ctx.fillStyle = DOT;
+    for (let ty = 0; ty < MARGIN + INNER + MARGIN; ty += 36) {
+      for (let tx = 0; tx < layout.width; tx += 36) {
+        ctx.beginPath();
+        ctx.arc(tx + 9, ty + 9, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(tx + 27, ty + 27, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  if (layout.card) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = '#FFFFFF';
+    roundRectPath(ctx, layout.card.x, layout.card.y, layout.card.w, layout.card.h, CARD_RADIUS);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if (theme === 'bow' && layout.bow && bowImg) {
+    ctx.drawImage(bowImg, layout.bow.x, layout.bow.y, layout.bow.w, layout.bow.h);
+  }
+
+  if (showHandle) {
+    ctx.fillStyle = PINK;
+    ctx.font = '600 17px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(BRAND_HANDLE, layout.width / 2, MARGIN + INNER + MARGIN + CAPTION_HEIGHT / 2 + 6);
+  }
+}
+
+function buildQrOptions(color: string, data: string, size: number) {
   return {
     width: size,
     height: size,
@@ -48,73 +148,65 @@ function buildQrOptions(theme: ThemeId, data: string, size: number) {
   };
 }
 
-// Builds "Theme 1": a pale pink polka-dot background behind a white rounded card, with the brand
-// handle printed below the card. The QR itself is layered on top separately, both on screen (CSS)
-// and when composited for download (canvas), the same way the old frame worked.
-function buildFrameSvgMarkup(_color: string) {
-  const cardX = CARD_MARGIN;
-  const cardY = CARD_MARGIN;
-  const captionY = CARD_MARGIN + CARD_SIZE + CARD_MARGIN + CAPTION_HEIGHT / 2 + 6;
-
-  return `
-<svg xmlns="http://www.w3.org/2000/svg" width="${FRAME_WIDTH}" height="${FRAME_HEIGHT}" viewBox="0 0 ${FRAME_WIDTH} ${FRAME_HEIGHT}">
-  <defs>
-    <pattern id="polka" width="36" height="36" patternUnits="userSpaceOnUse">
-      <rect width="36" height="36" fill="#FDEFF3" />
-      <circle cx="9" cy="9" r="4.5" fill="#F6C9D8" />
-      <circle cx="27" cy="27" r="4.5" fill="#F6C9D8" />
-    </pattern>
-    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#00000022" />
-    </filter>
-  </defs>
-
-  <rect width="${FRAME_WIDTH}" height="${FRAME_HEIGHT}" fill="url(#polka)" />
-  <rect x="${cardX}" y="${cardY}" width="${CARD_SIZE}" height="${CARD_SIZE}" rx="${CARD_RADIUS}" ry="${CARD_RADIUS}"
-    fill="#FFFFFF" filter="url(#cardShadow)" />
-
-  <text x="${FRAME_WIDTH / 2}" y="${captionY}" text-anchor="middle" font-family="Arial, sans-serif"
-    font-size="17" font-weight="600" fill="${CARD_CAPTION_COLOR}" letter-spacing="1.5">${BRAND_HANDLE}</text>
-</svg>`.trim();
-}
-
 interface QrHistoryItem {
   id: number;
   url: string;
   label: string | null;
-  theme: ThemeId | null;
+  card_theme: CardTheme | null;
+  dot_color: DotColor | null;
+  show_handle: boolean | null;
   created_at: string;
 }
 
 export default function QRCodeGenerator() {
   const [urlInput, setUrlInput] = useState('');
   const [labelInput, setLabelInput] = useState('');
-  const [theme, setTheme] = useState<ThemeId>('blossom');
-  const [includeFrame, setIncludeFrame] = useState(false);
+  const [cardTheme, setCardTheme] = useState<CardTheme>('white');
+  const [dotColor, setDotColor] = useState<DotColor>('black');
+  const [showHandle, setShowHandle] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const [history, setHistory] = useState<QrHistoryItem[]>([]);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [bowImg, setBowImg] = useState<HTMLImageElement | null>(null);
 
   const qrContainerRef = useRef<HTMLDivElement>(null);
   const qrInstanceRef = useRef<QRCodeStyling | null>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const currentSize = includeFrame ? FRAMED_QR_SIZE : PLAIN_QR_SIZE;
+  const layout = getLayout(cardTheme, showHandle);
 
-  // Create the QR instance once, append it to the container
+  // Load the bow image once; every theme's background redraw picks it up once it's ready.
   useEffect(() => {
-    qrInstanceRef.current = new QRCodeStyling(buildQrOptions(theme, ' ', currentSize));
+    const img = new Image();
+    img.onload = () => setBowImg(img);
+    img.src = bowUrl;
+  }, []);
+
+  // Create the QR instance once, append it to the container.
+  useEffect(() => {
+    qrInstanceRef.current = new QRCodeStyling(buildQrOptions(DOT_COLORS[dotColor].hex, ' ', layout.qrSize));
     if (qrContainerRef.current) {
       qrInstanceRef.current.append(qrContainerRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-render the QR whenever the resolved URL, theme, or frame size changes
+  // Re-render the QR whenever the resolved URL, color, or size (which depends on the theme) changes.
   useEffect(() => {
     if (!qrInstanceRef.current || !resolvedUrl) return;
-    qrInstanceRef.current.update(buildQrOptions(theme, resolvedUrl, currentSize));
-  }, [resolvedUrl, theme, currentSize]);
+    qrInstanceRef.current.update(buildQrOptions(DOT_COLORS[dotColor].hex, resolvedUrl, layout.qrSize));
+  }, [resolvedUrl, dotColor, layout.qrSize]);
+
+  // Redraw the background canvas whenever the theme, caption toggle, or bow image readiness changes.
+  useEffect(() => {
+    const canvas = bgCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    drawBackground(ctx, cardTheme, showHandle, layout, bowImg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardTheme, showHandle, bowImg, layout.width, layout.height]);
 
   const loadHistory = async () => {
     try {
@@ -145,7 +237,13 @@ export default function QRCodeGenerator() {
     if (!resolvedUrl) return;
     setStatus('saving');
     try {
-      await apiFetch('/qr/save', jsonBody({ url: resolvedUrl, label: labelInput.trim() || null, theme }));
+      await apiFetch('/qr/save', jsonBody({
+        url: resolvedUrl,
+        label: labelInput.trim() || null,
+        cardTheme,
+        dotColor,
+        showHandle,
+      }));
       setStatus('saved');
       setLabelInput('');
       await loadHistory();
@@ -167,52 +265,36 @@ export default function QRCodeGenerator() {
 
   const handleLoadFromHistory = (item: QrHistoryItem) => {
     setUrlInput(item.url.replace(/^https?:\/\//, ''));
-    if (item.theme) setTheme(item.theme);
+    if (item.card_theme) setCardTheme(item.card_theme);
+    if (item.dot_color) setDotColor(item.dot_color);
+    setShowHandle(!!item.show_handle);
     setResolvedUrl(item.url);
   };
 
-  const downloadPlain = () => {
-    if (!qrInstanceRef.current || !resolvedUrl) return;
-    const name = resolvedUrl.replace(/https?:\/\//, '').replace(/[^\w.-]/g, '-');
-    qrInstanceRef.current.download({ name: `qr-${name}`, extension: 'png' });
-  };
-
-  const downloadFramed = () => {
-    if (!qrContainerRef.current || !resolvedUrl) return;
-    const qrCanvas = qrContainerRef.current.querySelector('canvas');
-    if (!qrCanvas) return;
-
-    const svgMarkup = buildFrameSvgMarkup(THEMES[theme].dotColor);
-    const svgDataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgMarkup)))}`;
-
-    const frameImg = new Image();
-    frameImg.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = FRAME_WIDTH;
-      canvas.height = FRAME_HEIGHT;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      ctx.drawImage(frameImg, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-      ctx.drawImage(qrCanvas, FRAMED_QR_OFFSET_X, FRAMED_QR_OFFSET_Y, FRAMED_QR_SIZE, FRAMED_QR_SIZE);
-
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const objectUrl = URL.createObjectURL(blob);
-        const name = resolvedUrl.replace(/https?:\/\//, '').replace(/[^\w.-]/g, '-');
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.download = `qr-framed-${name}.png`;
-        a.click();
-        URL.revokeObjectURL(objectUrl);
-      }, 'image/png');
-    };
-    frameImg.src = svgDataUrl;
-  };
-
   const handleDownload = () => {
-    if (includeFrame) downloadFramed();
-    else downloadPlain();
+    if (!resolvedUrl || !qrContainerRef.current) return;
+    const qrCanvas = qrContainerRef.current.querySelector('canvas');
+    const bg = bgCanvasRef.current;
+    if (!qrCanvas || !bg) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = layout.width;
+    canvas.height = layout.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(bg, 0, 0);
+    ctx.drawImage(qrCanvas, layout.qrX, layout.qrY, layout.qrSize, layout.qrSize);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const objectUrl = URL.createObjectURL(blob);
+      const name = resolvedUrl.replace(/https?:\/\//, '').replace(/[^\w.-]/g, '-');
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `qr-${name}.png`;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    }, 'image/png');
   };
 
   return (
@@ -238,16 +320,30 @@ export default function QRCodeGenerator() {
           </div>
 
           <h2 className="panel-label" style={{ marginTop: 20 }}>Theme</h2>
-          <div className="theme-picker">
-            {(Object.keys(THEMES) as ThemeId[]).map((id) => (
+          <div className="view-toggle">
+            {(Object.keys(CARD_THEMES) as CardTheme[]).map((id) => (
               <button
                 key={id}
                 type="button"
-                className={`theme-swatch ${theme === id ? 'is-active' : ''}`}
-                style={{ background: THEMES[id].swatch }}
-                onClick={() => setTheme(id)}
-                aria-label={THEMES[id].label}
-                title={THEMES[id].label}
+                className={`view-toggle-btn ${cardTheme === id ? 'is-active' : ''}`}
+                onClick={() => setCardTheme(id)}
+              >
+                {CARD_THEMES[id]}
+              </button>
+            ))}
+          </div>
+
+          <h2 className="panel-label" style={{ marginTop: 20 }}>QR color</h2>
+          <div className="theme-picker">
+            {(Object.keys(DOT_COLORS) as DotColor[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                className={`theme-swatch ${dotColor === id ? 'is-active' : ''}`}
+                style={{ background: DOT_COLORS[id].hex }}
+                onClick={() => setDotColor(id)}
+                aria-label={DOT_COLORS[id].label}
+                title={DOT_COLORS[id].label}
               />
             ))}
           </div>
@@ -255,10 +351,10 @@ export default function QRCodeGenerator() {
           <label className="frame-toggle">
             <input
               type="checkbox"
-              checked={includeFrame}
-              onChange={(e) => setIncludeFrame(e.target.checked)}
+              checked={showHandle}
+              onChange={(e) => setShowHandle(e.target.checked)}
             />
-            Add card design (Theme 1: pink dots + {BRAND_HANDLE})
+            Add {BRAND_HANDLE} (optional)
           </label>
 
           <button className="calculate-btn" onClick={handleGenerate} style={{ marginTop: 12 }}>
@@ -288,30 +384,12 @@ export default function QRCodeGenerator() {
         <section className="calc-panel calc-result-panel">
           <h2 className="panel-label">Preview</h2>
 
-          <div
-            className="qr-stage"
-            style={{
-              width: includeFrame ? FRAME_WIDTH : PLAIN_QR_SIZE,
-              height: includeFrame ? FRAME_HEIGHT : PLAIN_QR_SIZE,
-            }}
-          >
-            {includeFrame && (
-              <svg
-                className="qr-frame-svg"
-                dangerouslySetInnerHTML={{ __html: buildFrameSvgMarkup(THEMES[theme].dotColor).replace(/<\/?svg[^>]*>/g, '') }}
-                viewBox={`0 0 ${FRAME_WIDTH} ${FRAME_HEIGHT}`}
-                width={FRAME_WIDTH}
-                height={FRAME_HEIGHT}
-              />
-            )}
+          <div className="qr-stage" style={{ width: layout.width, height: layout.height }}>
+            <canvas ref={bgCanvasRef} width={layout.width} height={layout.height} className="qr-bg-canvas" />
             <div
               ref={qrContainerRef}
               className={!resolvedUrl ? 'qr-canvas-hidden' : ''}
-              style={
-                includeFrame
-                  ? { position: 'absolute', top: FRAMED_QR_OFFSET_Y, left: FRAMED_QR_OFFSET_X, width: FRAMED_QR_SIZE, height: FRAMED_QR_SIZE }
-                  : undefined
-              }
+              style={{ position: 'absolute', top: layout.qrY, left: layout.qrX, width: layout.qrSize, height: layout.qrSize }}
             />
           </div>
 
@@ -331,7 +409,7 @@ export default function QRCodeGenerator() {
               />
 
               <button className="calculate-btn" onClick={handleDownload} style={{ marginBottom: 10 }}>
-                Download PNG (transparent)
+                Download PNG
               </button>
               <button
                 className="save-btn"
