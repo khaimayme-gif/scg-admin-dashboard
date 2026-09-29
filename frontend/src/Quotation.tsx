@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiFetch, jsonBody } from './api';
 import { renderQuotationPng, downloadBlob } from './quotationImage';
+import type { QuotationForOrder } from './Orders';
 
 interface QuoteItem {
   name: string;
@@ -21,6 +22,8 @@ interface Quotation {
   revenue_thb: number;
   total_mmk: number | null;
   total_jpy: number | null;
+  order_id: number | null; // set once "Make Order" has turned this quotation into an order
+  order_no: string | null;
 }
 
 interface FormItem {
@@ -44,7 +47,13 @@ const todayLocal = () => new Date().toLocaleDateString('en-CA');
 
 const emptyItem = (): FormItem => ({ name: '', sellingPrice: '', originalPrice: '' });
 
-export default function Quotation() {
+interface QuotationProps {
+  // Switches to the Orders page with the order form filled from this quotation
+  // (or, if it already became an order, opens that order).
+  onMakeOrder?: (q: QuotationForOrder) => void;
+}
+
+export default function Quotation({ onMakeOrder }: QuotationProps) {
   const [customerName, setCustomerName] = useState('');
   const [channel, setChannel] = useState('tiktok');
   const [quoteDate, setQuoteDate] = useState(todayLocal());
@@ -170,6 +179,17 @@ export default function Quotation() {
     }
   };
 
+  const makeOrderButton = (q: Quotation) =>
+    onMakeOrder && (
+      <button
+        className={`make-order-btn ${q.order_id ? 'is-ordered' : ''}`}
+        onClick={() => onMakeOrder(q)}
+        title={q.order_id ? `Already order ${q.order_no}. Click to open it.` : 'Customer paid: turn this quotation into an order'}
+      >
+        {q.order_id ? `Order ${q.order_no ?? ''} ✓` : 'Make Order'}
+      </button>
+    );
+
   const amountLine = (mmk: number | null, jpy: number | null) =>
     mmk === null || jpy === null ? 'Set exchange rates in Settings' : `${fmt(mmk)} MMK and ${fmt(jpy)} Yen`;
 
@@ -217,6 +237,11 @@ export default function Quotation() {
             >
               {downloadingId === lastQuotation.id ? 'Preparing…' : 'Download quotation'}
             </button>
+            {onMakeOrder && (
+              <button className="save-btn save-btn-secondary" onClick={() => onMakeOrder(lastQuotation)}>
+                {lastQuotation.order_id ? `Open order ${lastQuotation.order_no ?? ''}` : 'Make Order'}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -378,6 +403,7 @@ export default function Quotation() {
                       {fmt(q.revenue_thb)} THB
                     </td>
                     <td className="quote-row-actions">
+                      {makeOrderButton(q)}
                       <button
                         className="item-remove"
                         onClick={() => handleDownload(q)}

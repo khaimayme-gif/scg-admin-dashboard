@@ -504,3 +504,20 @@ html, body, #root {
 .view-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
 .view-toggle-btn { background: none; border: none; padding: 8px 18px; font-size: 14px; cursor: pointer; color: #55534B; }
 .view-toggle-btn.is-active { background: var(--forest-deep); color: var(--ivory); }
+/* Order form: item lines with cost, selling price and details */
+.order-item-block { display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+.order-item-block:last-child { border-bottom: none; padding-bottom: 0; }
+.order-item-details { width: 100%; resize: vertical; min-height: 44px; font-family: inherit; font-size: 13px; line-height: 1.4; }
+.order-hint { margin: -2px 0 10px; }
+.order-origin { margin: -8px 0 14px; }
+.warn-text { color: #7A5A12; background: #F8F0DC; border-radius: 6px; font-size: 13px; padding: 8px 12px; margin: 0 0 14px; }
+.save-btn-secondary { background: var(--blush); color: var(--plum); }
+
+/* Quotation rows: Make Order / Open order */
+.make-order-btn { background: var(--forest-deep); color: var(--ivory); border: none; border-radius: 6px; padding: 0 12px; height: 30px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.make-order-btn:hover { opacity: 0.9; }
+.make-order-btn.is-ordered { background: #E3EEDF; color: #2F5A2A; }
+.order-item-head { display: flex; gap: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #8A887F; margin-bottom: -2px; }
+.order-item-head-spacer { width: 30px; flex-shrink: 0; }
+.modal-card .order-form-actions .save-btn { width: auto; flex: 1 1 200px; margin-top: 8px; }
+.modal-card .order-form-actions .save-btn ~ .add-item-btn { margin: 8px 0 0; }

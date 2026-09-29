@@ -31,9 +31,12 @@ module.exports = async (req, res, [first, second]) => {
 
   if (!first && req.method === 'GET') {
     const result = await pool.query(
-      `SELECT id, quote_no, customer_name, channel, to_char(quote_date, 'YYYY-MM-DD') AS quote_date, order_place,
-              items_json, total_thb, original_thb, revenue_thb, total_mmk, total_jpy
-       FROM quotations ORDER BY created_at DESC, id DESC`
+      `SELECT q.id, q.quote_no, q.customer_name, q.channel, to_char(q.quote_date, 'YYYY-MM-DD') AS quote_date,
+              q.order_place, q.items_json, q.total_thb, q.original_thb, q.revenue_thb, q.total_mmk, q.total_jpy,
+              o.id AS order_id, o.order_no
+       FROM quotations q
+       LEFT JOIN orders o ON o.quotation_id = q.id
+       ORDER BY q.created_at DESC, q.id DESC`
     );
     return res.status(200).json(result.rows.map(parse));
   }
@@ -79,7 +82,8 @@ module.exports = async (req, res, [first, second]) => {
                                  total_thb, original_thb, revenue_thb, total_mmk, total_jpy)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING id, quote_no, customer_name, channel, to_char(quote_date, 'YYYY-MM-DD') AS quote_date, order_place,
-                   items_json, total_thb, original_thb, revenue_thb, total_mmk, total_jpy`,
+                   items_json, total_thb, original_thb, revenue_thb, total_mmk, total_jpy,
+                   NULL::integer AS order_id, NULL::text AS order_no`,
         [
           quoteNo,
           customerName.trim(),

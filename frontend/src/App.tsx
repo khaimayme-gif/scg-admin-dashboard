@@ -8,6 +8,7 @@ import './App.css';
 import Settings from './Settings';
 import Items from './Items';
 import Orders from './Orders';
+import type { OrderIntent, QuotationForOrder } from './Orders';
 
 const API_BASE = '/api';
 
@@ -15,6 +16,13 @@ export default function App() {
   const [active, setActive] = useState('quotation'); 
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  // "Make Order" on a quotation hands it to the Orders page, which opens the prefilled form.
+  const [orderIntent, setOrderIntent] = useState<OrderIntent | null>(null);
+
+  const handleMakeOrder = (quotation: QuotationForOrder) => {
+    setOrderIntent({ kind: 'fromQuotation', quotation });
+    setActive('orders');
+  };
 
   useEffect(() => {
     fetch(`${API_BASE}/auth/check`, { credentials: 'include' })
@@ -48,11 +56,13 @@ export default function App() {
     <div className="app-shell">
       <Sidebar active={active} onSelect={setActive} onLogout={handleLogout} />
       <main className="app-content">
-        {active === 'quotation' && <Quotation />} 
+        {active === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {active === 'qr' && <QRCodeGenerator />}
         {active === 'settings' && <Settings />}
         {active === 'items' && <Items />}
-        {active === 'orders' && <Orders />}
+        {active === 'orders' && (
+          <Orders intent={orderIntent} onIntentHandled={() => setOrderIntent(null)} />
+        )}
       </main>
     </div>
   );

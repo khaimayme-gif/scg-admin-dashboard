@@ -98,6 +98,32 @@ function ensureSchema() {
     `)).then(() => pool.query(`
       UPDATE orders SET selling_price = revenue, revenue = revenue - cost
       WHERE selling_price IS NULL
+    `)).then(() => pool.query(`
+      ALTER TABLE orders
+        ADD COLUMN IF NOT EXISTS order_no TEXT,
+        ADD COLUMN IF NOT EXISTS quotation_id INTEGER,
+        ADD COLUMN IF NOT EXISTS recipient TEXT,
+        ADD COLUMN IF NOT EXISTS delivery_date DATE,
+        ADD COLUMN IF NOT EXISTS delivery_address TEXT,
+        ADD COLUMN IF NOT EXISTS delivery_note TEXT
+    `)).then(() => pool.query(`
+      -- Give orders made before order numbers existed an "SCG-YYYYMMDD-NNN" number, numbered
+      -- by creation day in Bangkok. Deterministic, so two cold starts running it at once agree.
+      UPDATE orders o SET order_no = n.no
+      FROM (
+        SELECT id,
+               'SCG-' || to_char(COALESCE(created_at, NOW()) AT TIME ZONE 'Asia/Bangkok', 'YYYYMMDD') || '-' ||
+               lpad(row_number() OVER (
+                 PARTITION BY to_char(COALESCE(created_at, NOW()) AT TIME ZONE 'Asia/Bangkok', 'YYYYMMDD')
+                 ORDER BY id
+               )::text, 3, '0') AS no
+        FROM orders WHERE order_no IS NULL
+      ) n
+      WHERE o.id = n.id
+    `)).then(() => pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS orders_order_no ON orders (order_no) WHERE order_no IS NOT NULL
+    `)).then(() => pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS orders_quotation_id ON orders (quotation_id) WHERE quotation_id IS NOT NULL
     `))
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS quotations (
