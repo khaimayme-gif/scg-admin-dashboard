@@ -14,13 +14,22 @@ const THEMES: Record<ThemeId, { label: string; dotColor: string; swatch: string 
 
 const BRAND_HANDLE = '@sochicgifts';
 
-// Frame layout constants (all in px, shared between the on-screen preview and the download composite)
-const FRAME_WIDTH = 360;
-const FRAME_HEIGHT = 430;
-const FRAMED_QR_SIZE = 260;
-const FRAMED_QR_OFFSET_X = (FRAME_WIDTH - FRAMED_QR_SIZE) / 2;
-const FRAMED_QR_OFFSET_Y = 108;
+// Card layout constants (all in px, shared between the on-screen preview and the download composite).
+// This is "Theme 1": a dotted pink background behind a white rounded card, with the brand handle
+// printed below the card. No banner, no corner brackets.
+const CARD_FRAME_WIDTH = 400;
+const CARD_MARGIN = 24; // gap between the outer edge and the white card, on the top/left/right
+const CARD_SIZE = CARD_FRAME_WIDTH - CARD_MARGIN * 2;
+const CARD_RADIUS = 32;
+const CARD_QR_PADDING = 36; // gap between the card edge and the QR code inside it
+const FRAMED_QR_SIZE = CARD_SIZE - CARD_QR_PADDING * 2;
+const FRAMED_QR_OFFSET_X = CARD_MARGIN + CARD_QR_PADDING;
+const FRAMED_QR_OFFSET_Y = CARD_MARGIN + CARD_QR_PADDING;
+const CAPTION_HEIGHT = 64; // space below the card for the @sochicgifts handle
+const FRAME_WIDTH = CARD_FRAME_WIDTH;
+const FRAME_HEIGHT = CARD_MARGIN + CARD_SIZE + CARD_MARGIN + CAPTION_HEIGHT;
 const PLAIN_QR_SIZE = 300;
+const CARD_CAPTION_COLOR = '#C9698C'; // dusty rose, independent of the QR dot-color theme below
 
 function buildQrOptions(theme: ThemeId, data: string, size: number) {
   const color = THEMES[theme].dotColor;
@@ -39,32 +48,33 @@ function buildQrOptions(theme: ThemeId, data: string, size: number) {
   };
 }
 
-// Builds the decorative frame (corner brackets, "SCAN ME" banner, brand handle) as an SVG string.
-// The QR itself is layered on top separately, both on screen (CSS) and when composited for download (canvas).
-function buildFrameSvgMarkup(color: string) {
-  const bx = FRAMED_QR_OFFSET_X - 14;
-  const by = FRAMED_QR_OFFSET_Y - 14;
-  const bw = FRAMED_QR_SIZE + 28;
-  const bh = FRAMED_QR_SIZE + 28;
-  const armLen = 34;
-
-  const corner = (x: number, y: number, hDir: 1 | -1, vDir: 1 | -1) => `
-    <path d="M ${x} ${y + vDir * armLen} L ${x} ${y} L ${x + hDir * armLen} ${y}"
-      stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-  `;
+// Builds "Theme 1": a pale pink polka-dot background behind a white rounded card, with the brand
+// handle printed below the card. The QR itself is layered on top separately, both on screen (CSS)
+// and when composited for download (canvas), the same way the old frame worked.
+function buildFrameSvgMarkup(_color: string) {
+  const cardX = CARD_MARGIN;
+  const cardY = CARD_MARGIN;
+  const captionY = CARD_MARGIN + CARD_SIZE + CARD_MARGIN + CAPTION_HEIGHT / 2 + 6;
 
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${FRAME_WIDTH}" height="${FRAME_HEIGHT}" viewBox="0 0 ${FRAME_WIDTH} ${FRAME_HEIGHT}">
-  ${corner(bx, by, 1, 1)}
-  ${corner(bx + bw, by, -1, 1)}
-  ${corner(bx, by + bh, 1, -1)}
-  ${corner(bx + bw, by + bh, -1, -1)}
+  <defs>
+    <pattern id="polka" width="36" height="36" patternUnits="userSpaceOnUse">
+      <rect width="36" height="36" fill="#FDEFF3" />
+      <circle cx="9" cy="9" r="4.5" fill="#F6C9D8" />
+      <circle cx="27" cy="27" r="4.5" fill="#F6C9D8" />
+    </pattern>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#00000022" />
+    </filter>
+  </defs>
 
-  <path d="M 90 12 h 180 a 14 14 0 0 1 14 14 v 30 a 14 14 0 0 1 -14 14 h -60 l -20 22 l -20 -22 h -80 a 14 14 0 0 1 -14 -14 v -30 a 14 14 0 0 1 14 -14 z"
-    fill="${color}" />
-  <text x="180" y="55" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF" letter-spacing="1">SCAN ME</text>
+  <rect width="${FRAME_WIDTH}" height="${FRAME_HEIGHT}" fill="url(#polka)" />
+  <rect x="${cardX}" y="${cardY}" width="${CARD_SIZE}" height="${CARD_SIZE}" rx="${CARD_RADIUS}" ry="${CARD_RADIUS}"
+    fill="#FFFFFF" filter="url(#cardShadow)" />
 
-  <text x="180" y="${by + bh + 34}" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="600" fill="${color}" letter-spacing="2">${BRAND_HANDLE.toUpperCase()}</text>
+  <text x="${FRAME_WIDTH / 2}" y="${captionY}" text-anchor="middle" font-family="Arial, sans-serif"
+    font-size="17" font-weight="600" fill="${CARD_CAPTION_COLOR}" letter-spacing="1.5">${BRAND_HANDLE}</text>
 </svg>`.trim();
 }
 
@@ -248,7 +258,7 @@ export default function QRCodeGenerator() {
               checked={includeFrame}
               onChange={(e) => setIncludeFrame(e.target.checked)}
             />
-            Add frame ("SCAN ME" + {BRAND_HANDLE})
+            Add card design (Theme 1: pink dots + {BRAND_HANDLE})
           </label>
 
           <button className="calculate-btn" onClick={handleGenerate} style={{ marginTop: 12 }}>
