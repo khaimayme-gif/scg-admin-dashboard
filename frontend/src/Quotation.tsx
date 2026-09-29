@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiFetch, jsonBody } from './api';
+import { renderQuotationPng, downloadBlob } from './quotationImage';
 
 interface QuoteItem {
   name: string;
@@ -9,6 +10,7 @@ interface QuoteItem {
 
 interface Quotation {
   id: number;
+  quote_no: string;
   customer_name: string;
   channel: string;
   quote_date: string;
@@ -54,6 +56,7 @@ export default function Quotation() {
   const [saved, setSaved] = useState<Quotation | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const loadHistory = () => {
     apiFetch('/quotations')
@@ -148,6 +151,22 @@ export default function Quotation() {
     loadHistory();
   };
 
+  const handleDownload = async (q: Quotation) => {
+    setDownloadingId(q.id);
+    try {
+      const blob = await renderQuotationPng({
+        quoteNo: q.quote_no,
+        quoteDate: q.quote_date,
+        items: q.items.map((it) => ({ name: it.name, sellingPrice: it.sellingPrice })),
+      });
+      downloadBlob(blob, `SCG-Quotation-${q.quote_no}.png`);
+    } catch {
+      setError('Could not create the quotation image.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const amountLine = (mmk: number | null, jpy: number | null) =>
     mmk === null || jpy === null ? 'Set exchange rates in Settings' : `${fmt(mmk)} MMK and ${fmt(jpy)} Yen`;
 
@@ -163,6 +182,7 @@ export default function Quotation() {
           <h2 className="panel-label">Quotation ready</h2>
           <div className="quote-summary">
             <p><strong>{saved.customer_name}</strong></p>
+            <p>Quotation ID: {saved.quote_no}</p>
             <p>Channel: {CHANNELS[saved.channel] ?? saved.channel}</p>
             <p>Date: {saved.quote_date}</p>
             <p>Order place: {saved.order_place}</p>
@@ -181,6 +201,9 @@ export default function Quotation() {
             Revenue {fmt(saved.revenue_thb)} THB, for you only, never shown to the customer.
           </p>
           <div className="order-form-actions">
+            <button className="save-btn" onClick={() => handleDownload(saved)} disabled={downloadingId === saved.id}>
+              {downloadingId === saved.id ? 'Preparing…' : 'Download quotation'}
+            </button>
             <button className="add-item-btn" onClick={startNew}>New quotation</button>
           </div>
         </div>
@@ -309,6 +332,7 @@ export default function Quotation() {
             <table className="items-table">
               <thead>
                 <tr>
+                  <th>Quotation ID</th>
                   <th>Date</th>
                   <th>Customer</th>
                   <th>Place</th>
@@ -324,6 +348,7 @@ export default function Quotation() {
               <tbody>
                 {history.map((q) => (
                   <tr key={q.id}>
+                    <td>{q.quote_no}</td>
                     <td>{q.quote_date}</td>
                     <td>{q.customer_name}</td>
                     <td>{q.order_place}</td>
@@ -335,7 +360,16 @@ export default function Quotation() {
                     <td className={`items-price-cell ${q.revenue_thb < 0 ? 'profit-negative' : ''}`}>
                       {fmt(q.revenue_thb)} THB
                     </td>
-                    <td>
+                    <td className="quote-row-actions">
+                      <button
+                        className="item-remove"
+                        onClick={() => handleDownload(q)}
+                        disabled={downloadingId === q.id}
+                        aria-label="Download quotation"
+                        title="Download quotation"
+                      >
+                        {downloadingId === q.id ? '…' : '⬇'}
+                      </button>
                       <button className="item-remove" onClick={() => handleDelete(q)} aria-label="Delete quotation">×</button>
                     </td>
                   </tr>

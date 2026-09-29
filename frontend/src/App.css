@@ -241,6 +241,11 @@ html, body, #root {
   font-family: 'IBM Plex Mono', monospace;
 }
 
+.quote-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
 .item-remove {
   width: 30px;
   height: 30px;

@@ -102,6 +102,7 @@ function ensureSchema() {
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS quotations (
         id SERIAL PRIMARY KEY,
+        quote_no TEXT,
         customer_name TEXT NOT NULL,
         channel TEXT NOT NULL,
         quote_date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -116,6 +117,11 @@ function ensureSchema() {
       )
     `)).then(() => pool.query(`
       CREATE INDEX IF NOT EXISTS quotations_created_at ON quotations (created_at DESC)
+    `)).then(() => pool.query(`
+      ALTER TABLE quotations ADD COLUMN IF NOT EXISTS quote_no TEXT
+    `)).then(() => pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS quotations_quote_no ON quotations (quote_no)
+      WHERE quote_no IS NOT NULL
     `))
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
