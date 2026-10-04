@@ -9,6 +9,7 @@ import Settings from './Settings';
 import Items from './Items';
 import Orders from './Orders';
 import type { OrderIntent, QuotationForOrder } from './Orders';
+import ExpenseTracker from './ExpenseTracker';
 
 const API_BASE = '/api';
 
@@ -63,6 +64,7 @@ export default function App() {
         {active === 'orders' && (
           <Orders intent={orderIntent} onIntentHandled={() => setOrderIntent(null)} />
         )}
+        {active === 'expenses' && <ExpenseTracker />}
       </main>
     </div>
   );

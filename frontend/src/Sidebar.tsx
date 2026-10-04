@@ -13,7 +13,7 @@ const MODULES = [
   { id: 'templates', label: 'Template Library', ready: false },
   { id: 'gifts', label: 'Gift Packages', ready: false },
   { id: 'delivery', label: 'Delivery Schedule', ready: false },
-  { id: 'expenses', label: 'Expense Tracker', ready: false },
+  { id: 'expenses', label: 'Expense Tracker', ready: true },
   { id: 'profit', label: 'Monthly Profit', ready: false },
   { id: 'settings', label: 'Settings', ready: true },
 ];

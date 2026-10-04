@@ -23,6 +23,7 @@ const ROUTES = {
   orders: require('../lib/routes/orders'),
   qr: require('../lib/routes/qr'),
   quotations: require('../lib/routes/quotations'),
+  expenses: require('../lib/routes/expenses'),
 };
 
 // The rewrite preserves the original path in req.url and also passes it as ?apiPath=. Prefer

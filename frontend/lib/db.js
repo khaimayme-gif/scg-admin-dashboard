@@ -157,6 +157,22 @@ function ensureSchema() {
       WHERE quote_no IS NOT NULL
     `))
     .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS expenses (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        cost REAL NOT NULL DEFAULT 0,
+        unit TEXT,
+        currency TEXT NOT NULL DEFAULT 'THB',
+        details TEXT,
+        recurrence TEXT NOT NULL DEFAULT 'one_time',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `)).then(() => pool.query(`
+      CREATE INDEX IF NOT EXISTS expenses_expense_date ON expenses (expense_date DESC)
+    `))
+    .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,
         ip TEXT NOT NULL,
