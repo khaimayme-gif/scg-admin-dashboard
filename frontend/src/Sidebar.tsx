@@ -1,4 +1,4 @@
-import logo from './assets/sochic-logo.png';
+import logo from './assets/sochic-logo-pink.png';
 
 interface SidebarProps {
   active: string;
