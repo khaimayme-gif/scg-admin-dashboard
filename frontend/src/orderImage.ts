@@ -1,7 +1,8 @@
-import '@fontsource/space-grotesk/400.css';
-import '@fontsource/space-grotesk/500.css';
-import '@fontsource/space-grotesk/700.css';
-import '@fontsource/linden-hill/400.css';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/400-italic.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
 import bowUrl from './assets/quotation-bow.png';
 
 // Draws the "Order Confirmation" card as a PNG, matching the Canva template.
@@ -31,8 +32,7 @@ export interface OrderImageData {
   paymentTone: 'paid' | 'pending' | 'cancelled';
 }
 
-const SANS = "'Space Grotesk', 'Noto Sans Thai', 'Noto Sans Myanmar', sans-serif";
-const SERIF = "'Linden Hill', 'Noto Serif Thai', 'Noto Serif Myanmar', serif";
+const FONT = "'Inter', 'Noto Sans Thai', 'Noto Sans Myanmar', sans-serif";
 
 const GRAY = '#5b5c62';
 const RULE = '#d4d4d8';
@@ -52,10 +52,10 @@ const CARD_R = 54;
 const TEXT_L = 222;
 const TEXT_R = 858;
 
-const ROW_SIZE = 31; // label / value rows
+const ROW_SIZE = 29; // label / value rows
 const ROW_PITCH = 50;
-const ITEM_SIZE = 32;
-const DETAIL_SIZE = 20;
+const ITEM_SIZE = 30;
+const DETAIL_SIZE = 19;
 const DETAIL_PITCH = 28;
 
 const CURRENCY_SIGN: Record<string, string> = { THB: '฿', JPY: '¥', MMK: 'Ks' };
@@ -79,19 +79,12 @@ const loadImage = (src: string) =>
 
 const loadFonts = () =>
   Promise.all([
-    document.fonts.load(`700 66px ${SANS}`),
-    document.fonts.load(`400 28px ${SANS}`),
-    document.fonts.load(`400 31px ${SERIF}`),
+    document.fonts.load(`700 66px ${FONT}`),
+    document.fonts.load(`600 27px ${FONT}`),
+    document.fonts.load(`500 ${ITEM_SIZE}px ${FONT}`),
+    document.fonts.load(`400 28px ${FONT}`),
+    document.fonts.load(`italic 400 28px ${FONT}`),
   ]);
-
-// Linden Hill is lighter than the template's serif, so a hairline stroke in the same colour adds weight.
-const serif = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, weight = 0.4) => {
-  ctx.strokeStyle = ctx.fillStyle;
-  ctx.lineWidth = weight;
-  ctx.lineJoin = 'round';
-  ctx.fillText(text, x, y);
-  ctx.strokeText(text, x, y);
-};
 
 // Greedy word wrap using the context's current font. A single word wider than maxW is split
 // by character, so a long unbroken address or Thai text (no spaces) still fits.
@@ -125,12 +118,11 @@ const wrap = (ctx: CanvasRenderingContext2D, text: string, maxW: number): string
 type Draw = (ctx: CanvasRenderingContext2D, paint: boolean) => number;
 
 const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, paint) => {
-  const text = (s: string, x: number, y: number, align: CanvasTextAlign, font: string, useSerif = false) => {
+  const text = (s: string, x: number, y: number, align: CanvasTextAlign, font: string) => {
     if (!paint) return;
     ctx.textAlign = align;
     ctx.font = font;
-    if (useSerif) serif(ctx, s, x, y);
-    else ctx.fillText(s, x, y);
+    ctx.fillText(s, x, y);
   };
 
   if (paint) {
@@ -144,21 +136,22 @@ const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, pain
   // Wordmark sits on the bow's tails.
   if (paint) {
     ctx.letterSpacing = '4px';
-    text('SOCHICGIFTS', W / 2 + 2, 318, 'center', `700 25px ${SANS}`);
+    text('SOCHICGIFTS', W / 2 + 2, 318, 'center', `700 25px ${FONT}`);
     ctx.letterSpacing = '1px';
-    text('ORDER', W / 2, 408, 'center', `700 70px ${SANS}`);
-    text('CONFIRMATION', W / 2, 480, 'center', `700 70px ${SANS}`);
+    text('ORDER', W / 2, 408, 'center', `700 68px ${FONT}`);
+    text('CONFIRMATION', W / 2, 480, 'center', `700 68px ${FONT}`);
     ctx.letterSpacing = '0px';
-    text('Your surprise is officially in the making ♡', W / 2, 546, 'center', `400 28px ${SANS}`);
-    text(`Order ID: ${data.orderNo}`, TEXT_L, 604, 'left', `400 20px ${SERIF}`, true);
-    text(`Date: ${formatDate(data.orderDate)}`, TEXT_R, 604, 'right', `400 20px ${SERIF}`, true);
-    ctx.letterSpacing = '1px';
-    text('ORDER DETAILS', W / 2, 650, 'center', `400 27px ${SANS}`);
+    text('Your surprise is officially in the making ♡', W / 2, 546, 'center', `italic 400 27px ${FONT}`);
+    text(`Order ID: ${data.orderNo}`, TEXT_L, 604, 'left', `400 20px ${FONT}`);
+    text(`Date: ${formatDate(data.orderDate)}`, TEXT_R, 604, 'right', `400 20px ${FONT}`);
+    ctx.letterSpacing = '2px';
+    text('ORDER DETAILS', W / 2, 650, 'center', `600 25px ${FONT}`);
     ctx.letterSpacing = '0px';
   }
 
   // Label / value rows. Values are right-aligned and wrap onto extra lines if long.
-  const rowFont = `400 ${ROW_SIZE}px ${SERIF}`;
+  const rowFont = `400 ${ROW_SIZE}px ${FONT}`;
+  const rowFontStrong = `500 ${ROW_SIZE}px ${FONT}`;
   let y = 700;
   const rows: [string, string][] = [
     ['Customer', data.customer],
@@ -171,10 +164,12 @@ const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, pain
   ctx.font = rowFont;
   for (const [label, value] of rows) {
     const labelW = ctx.measureText(label).width;
+    ctx.font = rowFontStrong;
     const lines = wrap(ctx, value || '—', TEXT_R - TEXT_L - labelW - 40);
-    text(label, TEXT_L, y, 'left', rowFont, true);
-    lines.forEach((line, i) => text(line, TEXT_R, y + i * (ROW_PITCH - 8), 'right', rowFont, true));
+    text(label, TEXT_L, y, 'left', rowFont);
+    lines.forEach((line, i) => text(line, TEXT_R, y + i * (ROW_PITCH - 8), 'right', rowFontStrong));
     y += ROW_PITCH + (lines.length - 1) * (ROW_PITCH - 8);
+    ctx.font = rowFont;
   }
 
   // Divider, then the gift selection.
@@ -185,13 +180,13 @@ const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, pain
     ctx.fillStyle = GRAY;
   }
   y += 62;
-  if (paint) ctx.letterSpacing = '1px';
-  text('YOUR GIFT SELECTION', W / 2, y, 'center', `400 27px ${SANS}`);
+  if (paint) ctx.letterSpacing = '2px';
+  text('YOUR GIFT SELECTION', W / 2, y, 'center', `600 25px ${FONT}`);
   if (paint) ctx.letterSpacing = '0px';
   y += 52;
 
-  const itemFont = `400 ${ITEM_SIZE}px ${SERIF}`;
-  const detailFont = `400 ${DETAIL_SIZE}px ${SERIF}`;
+  const itemFont = `500 ${ITEM_SIZE}px ${FONT}`;
+  const detailFont = `400 ${DETAIL_SIZE}px ${FONT}`;
   data.items.forEach((item, index) => {
     const lineTotal = item.sellingPrice * item.quantity;
     const price = lineTotal > 0 ? money(lineTotal, data.currency) : 'Complimentary';
@@ -201,8 +196,8 @@ const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, pain
     ctx.font = itemFont;
     const priceW = ctx.measureText(price).width;
     const nameLines = wrap(ctx, name, TEXT_R - TEXT_L - priceW - 40);
-    nameLines.forEach((line, i) => text(line, TEXT_L, y + i * (ITEM_SIZE + 8), 'left', itemFont, true));
-    text(price, TEXT_R, y, 'right', itemFont, true);
+    nameLines.forEach((line, i) => text(line, TEXT_L, y + i * (ITEM_SIZE + 8), 'left', itemFont));
+    text(price, TEXT_R, y, 'right', itemFont);
     y += (nameLines.length - 1) * (ITEM_SIZE + 8);
 
     ctx.font = detailFont;
@@ -210,7 +205,7 @@ const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, pain
     if (details.length > 0) y += 8;
     for (const line of details) {
       y += DETAIL_PITCH;
-      text(line, TEXT_L, y, 'left', detailFont, true);
+      text(line, TEXT_L, y, 'left', detailFont);
     }
     y += 64;
   });
@@ -223,30 +218,30 @@ const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, pain
     ctx.fillStyle = GRAY;
   }
   y += 62;
-  text('Order Total', TEXT_L, y, 'left', rowFont, true);
-  text(money(data.total, data.currency), TEXT_R, y, 'right', rowFont, true);
+  text('Order Total', TEXT_L, y, 'left', `600 ${ROW_SIZE}px ${FONT}`);
+  text(money(data.total, data.currency), TEXT_R, y, 'right', `700 ${ROW_SIZE}px ${FONT}`);
   y += ROW_PITCH - 6;
-  text('Payment Status', TEXT_L, y, 'left', rowFont, true);
+  text('Payment Status', TEXT_L, y, 'left', rowFont);
   if (paint) {
     const pill = PILL[data.paymentTone];
-    ctx.font = `400 26px ${SERIF}`;
+    ctx.font = `500 25px ${FONT}`;
     const pw = ctx.measureText(data.paymentLabel).width + 28;
     ctx.fillStyle = pill.bg;
     ctx.beginPath();
     ctx.roundRect(TEXT_R - pw + 6, y - 28, pw, 38, 10);
     ctx.fill();
     ctx.fillStyle = pill.fg;
-    text(data.paymentLabel, TEXT_R - 8, y, 'right', `400 26px ${SERIF}`, true);
+    text(data.paymentLabel, TEXT_R - 8, y, 'right', `500 25px ${FONT}`);
     ctx.fillStyle = GRAY;
   }
 
   // Footer.
   y += 60;
-  if (paint) ctx.letterSpacing = '1px';
-  text('PLEASE REVIEW YOUR ORDER', W / 2, y, 'center', `400 27px ${SANS}`);
+  if (paint) ctx.letterSpacing = '2px';
+  text('PLEASE REVIEW YOUR ORDER', W / 2, y, 'center', `600 25px ${FONT}`);
   if (paint) ctx.letterSpacing = '0px';
   y += 50;
-  const footFont = `400 23px ${SERIF}`;
+  const footFont = `400 22px ${FONT}`;
   ctx.font = footFont;
   const footer = wrap(
     ctx,
@@ -256,10 +251,10 @@ const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, pain
     780
   );
   for (const line of footer) {
-    text(line, W / 2, y, 'center', footFont, true);
+    text(line, W / 2, y, 'center', footFont);
     y += 35;
   }
-  text('Thank you for choosing So Chic Gifts ♡', W / 2, y, 'center', footFont, true);
+  text('Thank you for choosing So Chic Gifts ♡', W / 2, y, 'center', `500 22px ${FONT}`);
 
   return y; // baseline of the last line
 };
