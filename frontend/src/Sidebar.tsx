@@ -1,3 +1,5 @@
+import logo from './assets/sochic-logo.png';
+
 interface SidebarProps {
   active: string;
   onSelect: (id: string) => void;
@@ -5,7 +7,7 @@ interface SidebarProps {
 }
 
 const MODULES = [
-    { id: 'quotation', label: 'Quotation', ready: true },
+  { id: 'quotation', label: 'Quotation', ready: true },
   { id: 'items', label: 'Items', ready: true },
   { id: 'qr', label: 'QR Code Generator', ready: true },
   { id: 'orders', label: 'Orders', ready: true },
@@ -22,7 +24,8 @@ export default function Sidebar({ active, onSelect, onLogout }: SidebarProps) {
   return (
     <nav className="sidebar">
       <div className="sidebar-brand">
-        <span className="sidebar-brand-mark">SCG</span>
+        <img className="sidebar-logo" src={logo} alt="So Chic Gifts" />
+        <span className="sidebar-brand-mark">So Chic Gifts</span>
         <span className="sidebar-brand-sub">Admin</span>
       </div>
       <ul className="sidebar-list">
