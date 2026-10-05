@@ -20,6 +20,7 @@ export interface OrderImageData {
   orderDate: string; // YYYY-MM-DD
   customer: string; // e.g. "Jasmine / TikTok"
   recipient: string;
+  recipientPhone: string;
   deliveryDate: string; // YYYY-MM-DD or ''
   deliveryAddress: string;
   deliveryNote: string;
@@ -162,6 +163,7 @@ const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, pain
   const rows: [string, string][] = [
     ['Customer', data.customer],
     ['Recipient', data.recipient],
+    ['Phone', data.recipientPhone],
     ['Delivery Date', formatDate(data.deliveryDate)],
     ['Delivery Address', data.deliveryAddress],
     ['Delivery Note', data.deliveryNote],

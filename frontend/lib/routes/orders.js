@@ -7,7 +7,7 @@ const CHANNELS = ['tiktok', 'facebook'];
 
 const ORDER_COLUMNS = `id, order_no, quotation_id, customer_name, country, channel,
   to_char(order_date, 'YYYY-MM-DD') AS order_date, status, currency, selling_price, cost, revenue,
-  items_json, notes, recipient, to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
+  items_json, notes, recipient, recipient_phone, to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
   delivery_address, delivery_note`;
 
 const parse = (row) => ({ ...row, items: JSON.parse(row.items_json) });
@@ -122,7 +122,7 @@ module.exports = async (req, res, [first, second]) => {
   if (first === 'save' && req.method === 'POST') {
     const {
       id, customerName, country, channel, orderDate, status, currency, sellingPrice, items, notes,
-      recipient, deliveryDate, deliveryAddress, deliveryNote, quotationId,
+      recipient, recipientPhone, deliveryDate, deliveryAddress, deliveryNote, quotationId,
     } = req.body || {};
     if (!customerName || !country) {
       return res.status(400).json({ error: 'customerName and country are required' });
@@ -165,6 +165,7 @@ module.exports = async (req, res, [first, second]) => {
       JSON.stringify(cleanItems),
       notes || null,
       cleanText(recipient),
+      cleanText(recipientPhone),
       deliveryDate || null,
       cleanText(deliveryAddress),
       cleanText(deliveryNote),
@@ -175,9 +176,9 @@ module.exports = async (req, res, [first, second]) => {
       const result = await pool.query(
         `UPDATE orders SET customer_name = $1, country = $2, channel = $3, order_date = $4, status = $5,
            currency = $6, selling_price = $7, cost = $8, revenue = $9, items_json = $10, notes = $11,
-           recipient = $12, delivery_date = $13, delivery_address = $14, delivery_note = $15,
+           recipient = $12, recipient_phone = $13, delivery_date = $14, delivery_address = $15, delivery_note = $16,
            updated_at = NOW()
-         WHERE id = $16
+         WHERE id = $17
          RETURNING ${ORDER_COLUMNS}`,
         [...values, id]
       );
@@ -214,9 +215,9 @@ module.exports = async (req, res, [first, second]) => {
       const result = await client.query(
         `INSERT INTO orders (customer_name, country, channel, order_date, status, currency,
                              selling_price, cost, revenue, items_json, notes,
-                             recipient, delivery_date, delivery_address, delivery_note,
+                             recipient, recipient_phone, delivery_date, delivery_address, delivery_note,
                              order_no, quotation_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
          RETURNING ${ORDER_COLUMNS}`,
         [...values, orderNo, linkedQuotation]
       );

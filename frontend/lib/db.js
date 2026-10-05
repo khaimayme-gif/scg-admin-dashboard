@@ -110,6 +110,7 @@ function ensureSchema() {
         ADD COLUMN IF NOT EXISTS order_no TEXT,
         ADD COLUMN IF NOT EXISTS quotation_id INTEGER,
         ADD COLUMN IF NOT EXISTS recipient TEXT,
+        ADD COLUMN IF NOT EXISTS recipient_phone TEXT,
         ADD COLUMN IF NOT EXISTS delivery_date DATE,
         ADD COLUMN IF NOT EXISTS delivery_address TEXT,
         ADD COLUMN IF NOT EXISTS delivery_note TEXT

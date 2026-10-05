@@ -27,6 +27,7 @@ interface Order {
   items: OrderItem[];
   notes: string | null;
   recipient: string | null;
+  recipient_phone: string | null;
   delivery_date: string | null;
   delivery_address: string | null;
   delivery_note: string | null;
@@ -95,6 +96,7 @@ interface FormState {
   items: FormItem[];
   notes: string;
   recipient: string;
+  recipientPhone: string;
   deliveryDate: string;
   deliveryAddress: string;
   deliveryNote: string;
@@ -176,6 +178,7 @@ const emptyForm = (): FormState => ({
   items: [emptyItem()],
   notes: '',
   recipient: '',
+  recipientPhone: '',
   deliveryDate: '',
   deliveryAddress: '',
   deliveryNote: '',
@@ -205,6 +208,7 @@ const formFromOrder = (order: Order): FormState => ({
       : [emptyItem()],
   notes: order.notes ?? '',
   recipient: order.recipient ?? '',
+  recipientPhone: order.recipient_phone ?? '',
   deliveryDate: order.delivery_date ?? '',
   deliveryAddress: order.delivery_address ?? '',
   deliveryNote: order.delivery_note ?? '',
@@ -243,6 +247,7 @@ const imageDataFor = (o: Order) => {
     orderDate: o.order_date,
     customer: channel ? `${o.customer_name} / ${channel}` : o.customer_name,
     recipient: o.recipient ?? '',
+    recipientPhone: o.recipient_phone ?? '',
     deliveryDate: o.delivery_date ?? '',
     deliveryAddress: o.delivery_address ?? '',
     deliveryNote: o.delivery_note ?? '',
@@ -305,40 +310,52 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  // Sum of each item's selling price x quantity. The overall "Selling price" field auto-fills
+  // to this whenever the items change, but stays a normal editable input otherwise, so an admin
+  // can still hand-type a different total (a discount, say) without it being overwritten until
+  // they touch an item again.
+  const sellingSumOf = (items: FormItem[]) =>
+    items.reduce((sum, it) => (it.name.trim() ? sum + (Number(it.sellingPrice) || 0) * (Number(it.quantity) || 1) : sum), 0);
+
   const updateItem = (index: number, key: keyof FormItem, value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      items: prev.items.map((it, i) => (i === index ? { ...it, [key]: value } : it)),
-    }));
+    setForm((prev) => {
+      const items = prev.items.map((it, i) => (i === index ? { ...it, [key]: value } : it));
+      const resync = key === 'sellingPrice' || key === 'quantity';
+      return { ...prev, items, sellingPrice: resync ? String(sellingSumOf(items)) : prev.sellingPrice };
+    });
   };
 
   const addItemLine = () => {
-    setForm((prev) => ({ ...prev, items: [...prev.items, emptyItem()] }));
+    setForm((prev) => {
+      const items = [...prev.items, emptyItem()];
+      return { ...prev, items, sellingPrice: String(sellingSumOf(items)) };
+    });
   };
 
   const removeItemLine = (index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      items: prev.items.length === 1 ? prev.items : prev.items.filter((_, i) => i !== index),
-    }));
+    setForm((prev) => {
+      if (prev.items.length === 1) return prev;
+      const items = prev.items.filter((_, i) => i !== index);
+      return { ...prev, items, sellingPrice: String(sellingSumOf(items)) };
+    });
   };
 
-  // Fills the price of every line that matches a catalog name with that item's original cost.
-  // Catalog costs are in THB, so this switches the order currency to THB.
-  const fillCostsFromCatalog = () => {
-    let matched = 0;
-    const nextItems = form.items.map((line) => {
-      const found = catalog.find((c) => c.name.toLowerCase() === line.name.trim().toLowerCase());
-      if (!found || found.original_cost === null) return line;
-      matched += 1;
-      return { ...line, price: String(found.original_cost) };
+  // Love Note: a handwritten note, always complimentary to the customer; 10 THB is what it
+  // costs us to include, which still rolls into the order's cost and revenue.
+  const addLoveNote = () => {
+    setForm((prev) => {
+      const items = [...prev.items, { name: 'Love Note', quantity: '1', price: '10', sellingPrice: '0', details: '' }];
+      return { ...prev, items, sellingPrice: String(sellingSumOf(items)) };
     });
-    if (matched === 0) {
-      setFormError('No item names matched a catalog item that has an original cost.');
-      return;
-    }
-    setFormError('');
-    setForm((prev) => ({ ...prev, currency: 'THB', items: nextItems }));
+  };
+
+  // QR Love Note: a digital note behind a QR code. Price varies by what's involved, so cost and
+  // selling start blank; rename the line itself to note which template/design was used.
+  const addQrLoveNote = () => {
+    setForm((prev) => {
+      const items = [...prev.items, { name: 'QR Love Note', quantity: '1', price: '', sellingPrice: '', details: '' }];
+      return { ...prev, items, sellingPrice: String(sellingSumOf(items)) };
+    });
   };
 
   const startEdit = (order: Order) => {
@@ -424,6 +441,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
           })),
         notes: form.notes.trim(),
         recipient: form.recipient,
+        recipientPhone: form.recipientPhone,
         deliveryDate: form.deliveryDate || null,
         deliveryAddress: form.deliveryAddress,
         deliveryNote: form.deliveryNote,
@@ -465,13 +483,6 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
     0
   );
   const formRevenue = Number(form.sellingPrice || 0) - formCost;
-  // The confirmation image lists each item's selling price and shows the order selling price as
-  // the total, so flag it when the two would not add up on the customer's copy.
-  const formItemSelling = form.items.reduce(
-    (sum, it) => (it.name.trim() ? sum + (Number(it.sellingPrice) || 0) * (Number(it.quantity) || 1) : sum),
-    0
-  );
-  const sellingMismatch = formItemSelling > 0 && Math.round(formItemSelling) !== Math.round(Number(form.sellingPrice || 0));
 
   // Every month that has orders, plus the current month so it is always selectable.
   const monthOptions = Array.from(
@@ -625,6 +636,16 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                 />
               </div>
               <div className="order-field">
+                <label>Recipient phone (optional)</label>
+                <input
+                  type="tel"
+                  className="item-input"
+                  placeholder="e.g. 081 234 5678"
+                  value={form.recipientPhone}
+                  onChange={(e) => update('recipientPhone', e.target.value)}
+                />
+              </div>
+              <div className="order-field">
                 <label>Delivery date</label>
                 <input
                   type="date"
@@ -735,7 +756,8 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
             </div>
             <div className="order-form-actions">
               <button className="add-item-btn" onClick={addItemLine}>+ Add item</button>
-              <button className="add-item-btn" onClick={fillCostsFromCatalog}>Fill item prices from catalog costs (THB)</button>
+              <button className="add-item-btn" onClick={addLoveNote}>+ Add Love Note</button>
+              <button className="add-item-btn" onClick={addQrLoveNote}>+ QR Love Note</button>
             </div>
 
             <h3 className="order-subheading">Money</h3>
@@ -773,17 +795,6 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                 </div>
               </div>
             </div>
-
-            {sellingMismatch && (
-              <p className="warn-text">
-                Item selling prices add up to {fmt(formItemSelling)} {form.currency}, but the selling price is{' '}
-                {fmt(Number(form.sellingPrice || 0))} {form.currency}. The order details image shows the selling
-                price as the total.{' '}
-                <button className="order-edit-btn" onClick={() => update('sellingPrice', String(formItemSelling))}>
-                  Use {fmt(formItemSelling)}
-                </button>
-              </p>
-            )}
 
             <div className="order-field">
               <label>Notes (optional, never shown to the customer)</label>
