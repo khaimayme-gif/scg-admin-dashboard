@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import logo from './assets/sochic-logo.png';
 
 const API_BASE = '/api';
 
@@ -46,7 +47,8 @@ export default function Login({ onSuccess }: LoginProps) {
   return (
     <div className="login-screen">
       <form className="login-card" onSubmit={handleSubmit}>
-        <div className="login-brand">SCG Admin</div>
+        <img className="login-logo" src={logo} alt="So Chic Gifts" />
+        <div className="login-brand">So Chic Gifts</div>
         <input
           type="password"
           placeholder="Password"
