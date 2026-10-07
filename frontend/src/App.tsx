@@ -10,11 +10,12 @@ import Items from './Items';
 import Orders from './Orders';
 import type { OrderIntent, QuotationForOrder } from './Orders';
 import ExpenseTracker from './ExpenseTracker';
+import Dashboard from './Dashboard';
 
 const API_BASE = '/api';
 
 export default function App() {
-  const [active, setActive] = useState('quotation'); 
+  const [active, setActive] = useState('dashboard'); 
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   // "Make Order" on a quotation hands it to the Orders page, which opens the prefilled form.
@@ -23,6 +24,11 @@ export default function App() {
 
   const handleMakeOrder = (quotation: QuotationForOrder) => {
     setOrderIntent({ kind: 'fromQuotation', quotation });
+    setActive('orders');
+  };
+
+  const handleOpenOrder = (orderId: number) => {
+    setOrderIntent({ kind: 'edit', orderId });
     setActive('orders');
   };
 
@@ -76,6 +82,7 @@ export default function App() {
       </header>
       <Sidebar active={active} onSelect={handleSelect} onLogout={handleLogout} open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main className="app-content">
+        {active === 'dashboard' && <Dashboard onOpenOrder={handleOpenOrder} />}
         {active === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {active === 'qr' && <QRCodeGenerator />}
         {active === 'settings' && <Settings />}
