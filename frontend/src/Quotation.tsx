@@ -196,20 +196,17 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>Quotation</h1>
-        <p className="page-subtitle">Get a quotation for a customer, then turn it into an order.</p>
+      <header className="page-header page-header-row">
+        <div>
+          <h1>Quotation</h1>
+          <p className="page-subtitle">Get a quotation for a customer, then turn it into an order.</p>
+        </div>
+        <button className="new-order-btn" onClick={startNew}>New Quotation</button>
       </header>
 
-      {!showForm && (
-        <div className="order-form-actions">
-          <button className="save-btn" onClick={startNew}>Get Quotation</button>
-        </div>
-      )}
-
-      {!showForm && lastQuotation && (
-        <div className="calc-panel">
-          <h2 className="panel-label">Last quotation</h2>
+      {lastQuotation && (
+        <div className="calc-panel quote-latest">
+          <h2 className="panel-label">Latest quotation</h2>
           <div className="quote-summary">
             <p><strong>{lastQuotation.customer_name}</strong></p>
             <p>Quotation ID: {lastQuotation.quote_no}</p>
@@ -248,8 +245,12 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
       )}
 
       {showForm && (
-        <div className="calc-panel">
-          <h2 className="panel-label">Get Quotation</h2>
+        <div className="modal-backdrop">
+        <div className="modal-card">
+          <div className="modal-header">
+            <h2 className="panel-label">New quotation</h2>
+            <button className="item-remove" onClick={() => setShowForm(false)} aria-label="Close">×</button>
+          </div>
 
           <div className="order-form-grid">
             <div className="order-field">
@@ -357,17 +358,18 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
 
           <div className="order-form-actions">
             <button className="save-btn" onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Saving…' : 'Get quotation'}
+              {saving ? 'Saving…' : 'Create quotation'}
             </button>
             <button className="add-item-btn" onClick={() => setShowForm(false)} disabled={saving}>
               Cancel
             </button>
           </div>
         </div>
+        </div>
       )}
 
       <div className="calc-panel">
-        <h2 className="panel-label">Previous quotations</h2>
+        <h2 className="panel-label">All quotations</h2>
         {history.length === 0 ? (
           <p className="empty-state">No quotations yet.</p>
         ) : (

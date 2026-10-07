@@ -499,7 +499,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
           <h1>Orders</h1>
           <p className="page-subtitle">Every order So Chic Gifts has done, with selling price, cost and revenue.</p>
         </div>
-        <button className="new-order-btn" onClick={openNew}>+ New Order</button>
+        <button className="new-order-btn" onClick={openNew}>New Order</button>
       </header>
 
       {loading ? (
