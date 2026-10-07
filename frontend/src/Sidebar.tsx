@@ -4,6 +4,8 @@ interface SidebarProps {
   active: string;
   onSelect: (id: string) => void;
   onLogout: () => void;
+  open: boolean;
+  onClose: () => void;
 }
 
 const MODULES = [
@@ -20,9 +22,11 @@ const MODULES = [
   { id: 'settings', label: 'Settings', ready: true },
 ];
 
-export default function Sidebar({ active, onSelect, onLogout }: SidebarProps) {
+export default function Sidebar({ active, onSelect, onLogout, open, onClose }: SidebarProps) {
   return (
-    <nav className="sidebar">
+    <>
+    <div className={`sidebar-backdrop ${open ? 'is-open' : ''}`} onClick={onClose} aria-hidden="true" />
+    <nav className={`sidebar ${open ? 'is-open' : ''}`} aria-label="Main menu">
       <div className="sidebar-brand">
         <img className="sidebar-logo" src={logo} alt="So Chic Gifts" />
         <span className="sidebar-brand-mark">So Chic Gifts</span>
@@ -46,5 +50,6 @@ export default function Sidebar({ active, onSelect, onLogout }: SidebarProps) {
         Log out
       </button>
     </nav>
+    </>
   );
 }

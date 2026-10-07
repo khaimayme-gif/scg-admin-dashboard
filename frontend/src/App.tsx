@@ -18,11 +18,17 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   // "Make Order" on a quotation hands it to the Orders page, which opens the prefilled form.
+  const [menuOpen, setMenuOpen] = useState(false);
   const [orderIntent, setOrderIntent] = useState<OrderIntent | null>(null);
 
   const handleMakeOrder = (quotation: QuotationForOrder) => {
     setOrderIntent({ kind: 'fromQuotation', quotation });
     setActive('orders');
+  };
+
+  const handleSelect = (id: string) => {
+    setActive(id);
+    setMenuOpen(false);
   };
 
   useEffect(() => {
@@ -55,7 +61,20 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar active={active} onSelect={setActive} onLogout={handleLogout} />
+      <header className="mobile-topbar">
+        <button
+          className="menu-toggle"
+          onClick={() => setMenuOpen(true)}
+          aria-label="Open menu"
+          aria-expanded={menuOpen}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
+        <span className="mobile-topbar-title">So Chic Gifts</span>
+      </header>
+      <Sidebar active={active} onSelect={handleSelect} onLogout={handleLogout} open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main className="app-content">
         {active === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {active === 'qr' && <QRCodeGenerator />}

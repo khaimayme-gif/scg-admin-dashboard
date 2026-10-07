@@ -176,6 +176,19 @@ export default function QRCodeGenerator() {
 
   const layout = getLayout(cardTheme, showHandle);
 
+  // The preview is a fixed-size frame; shrink it to fit narrow screens.
+  const fitRef = useRef<HTMLDivElement>(null);
+  const [fitScale, setFitScale] = useState(1);
+  useEffect(() => {
+    const el = fitRef.current;
+    if (!el) return;
+    const update = () => setFitScale(Math.min(1, el.clientWidth / layout.width));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [layout.width]);
+
   // Load the bow image once; every theme's background redraw picks it up once it's ready.
   useEffect(() => {
     const img = new Image();
@@ -384,13 +397,15 @@ export default function QRCodeGenerator() {
         <section className="calc-panel calc-result-panel">
           <h2 className="panel-label">Preview</h2>
 
-          <div className="qr-stage" style={{ width: layout.width, height: layout.height }}>
+          <div className="qr-fit" ref={fitRef} style={{ height: layout.height * fitScale }}>
+          <div className="qr-stage" style={{ width: layout.width, height: layout.height, transform: `scale(${fitScale})`, transformOrigin: 'top left', margin: 0 }}>
             <canvas ref={bgCanvasRef} width={layout.width} height={layout.height} className="qr-bg-canvas" />
             <div
               ref={qrContainerRef}
               className={!resolvedUrl ? 'qr-canvas-hidden' : ''}
               style={{ position: 'absolute', top: layout.qrY, left: layout.qrX, width: layout.qrSize, height: layout.qrSize }}
             />
+          </div>
           </div>
 
           {!resolvedUrl ? (
