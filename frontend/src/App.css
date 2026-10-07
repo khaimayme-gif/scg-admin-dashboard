@@ -795,7 +795,7 @@ body {
 
 /* ===== Responsive ===== */
 .mobile-topbar, .sidebar-backdrop { display: none; }
-.qr-fit { width: 100%; max-width: 400px; margin: 0 auto 12px; }
+.qr-fit { width: 100%; max-width: 400px; margin: 0 auto 12px; overflow: hidden; }
 .orders-table-wrap { -webkit-overflow-scrolling: touch; }
 .orders-table-wrap .items-table { min-width: 720px; }
 
@@ -937,3 +937,10 @@ body {
 .quote-summary .quote-total { grid-column: 1 / -1; color: var(--ink); font-size: 15px; padding-top: 12px; border-top: 1px dashed var(--line); }
 .quote-latest .order-form-actions .save-btn { width: auto; margin: 0; min-width: 180px; }
 @media (max-width: 860px) { .quote-latest .order-form-actions .save-btn { width: 100%; } }
+
+/* QR preview: Original and Heart have no frame, so the stage shows only the code */
+.qr-stage.is-bare { border: none; background: transparent; border-radius: 0; }
+.qr-stage.is-bare .qr-bg-canvas { border-radius: 0; }
+.qr-stage.is-dark { background: #3A2A2F; border-radius: 12px; }
+.theme-swatch[aria-label="White"] { border-color: #E4D8DC; }
+.calc-layout > * { min-width: 0; }
