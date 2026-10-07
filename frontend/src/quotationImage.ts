@@ -12,8 +12,8 @@ import bowUrl from './assets/quotation-bow.png';
 export interface QuotationImageData {
   quoteNo: string; // e.g. 20260928-001
   quoteDate: string; // YYYY-MM-DD
+  currency: 'THB' | 'JPY' | 'MMK'; // what the customer pays in; every amount below is already in it
   items: { name: string; sellingPrice: number }[];
-  totalMmk?: number | null; // shown as "≈ X MMK" under the total, when a rate was available
 }
 
 const FONT = "'Inter', 'Noto Sans Myanmar', sans-serif";
@@ -35,6 +35,10 @@ const TEXT_L = 194;
 const TEXT_R = 886;
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
+
+// THB and JPY have their own signs; MMK is written out because the font has no kyat sign.
+const withCurrency = (n: number, currency: QuotationImageData['currency']) =>
+  currency === 'THB' ? `${fmt(n)} ฿` : currency === 'JPY' ? `${fmt(n)} ¥` : `${fmt(n)} MMK`;
 
 const formatDate = (iso: string) => {
   const [y, m, d] = iso.split('-');
@@ -74,7 +78,7 @@ export async function renderQuotationPng(data: QuotationImageData): Promise<Blob
 
   const rows = data.items.map((it) => ({
     name: it.name,
-    price: it.sellingPrice > 0 ? `${fmt(it.sellingPrice)} ฿` : 'Complimentary',
+    price: it.sellingPrice > 0 ? withCurrency(it.sellingPrice, data.currency) : 'Complimentary',
     free: it.sellingPrice <= 0,
   }));
   const total = data.items.reduce((sum, it) => sum + it.sellingPrice, 0);
@@ -174,15 +178,7 @@ export async function renderQuotationPng(data: QuotationImageData): Promise<Blob
   ctx.textAlign = 'right';
   ctx.fillStyle = PINK;
   ctx.font = `700 ${ROW_SIZE}px ${FONT}`;
-  ctx.fillText(`${fmt(total)} ฿`, TEXT_R, totalY);
-
-  // MMK equivalent, shown only if a rate was available when the quotation was made.
-  if (data.totalMmk) {
-    ctx.textAlign = 'right';
-    ctx.fillStyle = GRAY;
-    ctx.font = `400 24px ${FONT}`;
-    ctx.fillText(`≈ ${fmt(data.totalMmk)} MMK`, TEXT_R, totalY + 34);
-  }
+  ctx.fillText(withCurrency(total, data.currency), TEXT_R, totalY);
 
   // Footer.
   ctx.textAlign = 'center';

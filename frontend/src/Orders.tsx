@@ -45,6 +45,9 @@ export interface QuotationForOrder {
   order_place: string;
   total_thb: number;
   items: { name: string; sellingPrice: number; originalPrice: number }[];
+  // Prices on the quotation are in this currency, with the THB-to-yen rate used when it was made.
+  price_currency?: 'THB' | 'JPY';
+  rate_thb_to_jpy?: number | null;
 }
 
 export type OrderIntent =
@@ -231,26 +234,33 @@ const formFromOrder = (order: Order): FormState => ({
 // Turns a quotation into a new, unsaved order. The customer has paid by the time this runs,
 // so the status starts at "Paid". Cost comes from each item's original price and the selling
 // price from what was quoted.
-const formFromQuotation = (q: QuotationForOrder): FormState => ({
-  ...emptyForm(),
-  quotationId: q.id,
-  quoteNo: q.quote_no,
-  customerName: q.customer_name,
-  country: q.order_place,
-  channel: CHANNELS[q.channel] ? q.channel : 'tiktok',
-  status: 'paid',
-  currency: 'THB',
-  sellingPrice: String(q.total_thb ?? 0),
-  items:
-    q.items.length > 0
-      ? q.items.map((it) => ({
-          ...emptyItem(),
-          name: it.name,
-          price: String(it.originalPrice ?? 0),
-          sellingPrice: String(it.sellingPrice ?? 0),
-        }))
-      : [emptyItem()],
-});
+// Japan orders are in yen and Thailand orders in baht, whatever the customer pays in. Prices on
+// the quotation are converted with the rate the quotation was made with.
+const formFromQuotation = (q: QuotationForOrder): FormState => {
+  const orderCurrency = q.order_place === 'Japan' ? 'JPY' : 'THB';
+  const entry = q.price_currency ?? 'THB';
+  const rate = q.rate_thb_to_jpy || 0;
+  const convert = (amount: number) =>
+    entry === orderCurrency ? amount : Math.round(entry === 'THB' ? amount * rate : amount / (rate || 1));
+  const items = q.items.map((it) => ({
+    ...emptyItem(),
+    name: it.name,
+    price: String(convert(it.originalPrice ?? 0)),
+    sellingPrice: String(convert(it.sellingPrice ?? 0)),
+  }));
+  return {
+    ...emptyForm(),
+    quotationId: q.id,
+    quoteNo: q.quote_no,
+    customerName: q.customer_name,
+    country: q.order_place,
+    channel: CHANNELS[q.channel] ? q.channel : 'tiktok',
+    status: 'paid',
+    currency: orderCurrency,
+    sellingPrice: String(items.reduce((sum, it) => sum + Number(it.sellingPrice), 0)),
+    items: items.length > 0 ? items : [emptyItem()],
+  };
+};
 
 // Everything the confirmation image needs, and nothing it must not show (no cost, no revenue).
 const imageDataFor = (o: Order) => {
