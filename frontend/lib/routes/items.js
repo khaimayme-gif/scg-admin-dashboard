@@ -4,7 +4,7 @@ const { pool, ensureSchema } = require('../db');
 // The list never carries photo_data: it can be hundreds of KB per row. The photo is fetched
 // separately from /api/public/photo/:id, so `photo_version` is only there to bust the cache.
 const LIST_COLUMNS = `id, category, name, menu_price, original_cost, item_code, description, item_group, published,
-  (photo_data IS NOT NULL) AS has_photo, EXTRACT(EPOCH FROM updated_at)::bigint AS photo_version`;
+  (photo_data IS NOT NULL) AS has_photo, photo_name, EXTRACT(EPOCH FROM updated_at)::bigint AS photo_version`;
 
 // Photos arrive as data URLs already shrunk by the browser. Cap the size so a bad client
 // can't fill the database.
@@ -29,6 +29,81 @@ module.exports = async (req, res, [first, second]) => {
     res.setHeader('Content-Type', result.rows[0].photo_mime);
     res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
     return res.status(200).send(Buffer.from(result.rows[0].photo_data, 'base64'));
+  }
+
+  // Bulk import from the Excel template. All or nothing: any bad row rejects the whole file, and
+  // Item IDs are handed out per type in row order (CK01, CK02, ...), continuing after the highest
+  // number already used.
+  if (first === 'import' && req.method === 'POST') {
+    if (!requireSuper(req, res)) return;
+    await ensureSchema();
+    const rows = (req.body || {}).rows;
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'No rows to import' });
+    if (rows.length > 500) return res.status(400).json({ error: 'Import up to 500 items at a time' });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('items-import'))");
+      const types = (await client.query('SELECT name, code FROM item_types')).rows;
+      const typeByName = new Map(types.map((t) => [t.name.trim().toLowerCase(), t]));
+      const used = (await client.query('SELECT item_code FROM items WHERE item_code IS NOT NULL')).rows.map((r) => r.item_code);
+      const nextByCode = new Map();
+      const nextFor = (code) => {
+        if (!nextByCode.has(code)) {
+          const pattern = new RegExp(`^${code}(\\d+)$`);
+          let max = 0;
+          for (const u of used) {
+            const m = pattern.exec(u);
+            if (m) max = Math.max(max, Number(m[1]));
+          }
+          nextByCode.set(code, max);
+        }
+        nextByCode.set(code, nextByCode.get(code) + 1);
+        return `${code}${String(nextByCode.get(code)).padStart(2, '0')}`;
+      };
+
+      const errors = [];
+      const clean = [];
+      rows.forEach((r, index) => {
+        const rowNo = index + 1;
+        const type = typeByName.get(String(r.type || '').trim().toLowerCase());
+        const name = String(r.name || '').trim();
+        const price = Number(r.price);
+        const cost = r.cost === null || r.cost === undefined || r.cost === '' ? null : Number(r.cost);
+        if (!type) errors.push({ row: rowNo, error: `Unknown item type "${r.type ?? ''}"` });
+        else if (!name) errors.push({ row: rowNo, error: 'Item name is missing' });
+        else if (!Number.isFinite(price) || price < 0) errors.push({ row: rowNo, error: 'Selling price is missing or not a number' });
+        else if (cost !== null && (!Number.isFinite(cost) || cost < 0)) errors.push({ row: rowNo, error: 'Cost is not a number' });
+        else clean.push({ type, name, price, cost, row: r });
+      });
+      if (errors.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Some rows need fixing. Nothing was imported.', errors });
+      }
+
+      const created = [];
+      for (const c of clean) {
+        const code = nextFor(c.type.code);
+        const group = String(c.row.group || '').trim() || null;
+        const detail = String(c.row.detail || '').trim() || null;
+        const photoName = String(c.row.photoName || '').trim() || null;
+        const published = c.row.show === false || /^no$/i.test(String(c.row.show || '').trim()) ? false : true;
+        await client.query(
+          `INSERT INTO items (category, name, menu_price, original_cost, item_code, description, item_group, published, photo_name)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [c.type.name, c.name, c.price, c.cost, code, detail, group, published, photoName]
+        );
+        created.push(code);
+      }
+      await client.query('COMMIT');
+      return res.status(200).json({ created: created.length, first: created[0], last: created[created.length - 1] });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   if (first === 'save' && req.method === 'POST') {
