@@ -41,7 +41,7 @@ interface Rates {
 }
 
 const CHANNELS: Record<string, string> = { tiktok: 'TikTok', facebook: 'Facebook' };
-const PLACES = ['Thailand', 'Japan', 'Myanmar'];
+const PLACES = ['Thailand', 'Japan'];
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
 
