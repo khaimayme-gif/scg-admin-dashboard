@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { apiFetch, jsonBody } from './api';
 import { renderQuotationPng, downloadBlob } from './quotationImage';
 import type { QuotationForOrder } from './Orders';
+import { useRole } from './role';
 
 interface QuoteItem {
   name: string;
@@ -54,6 +55,9 @@ interface QuotationProps {
 }
 
 export default function Quotation({ onMakeOrder }: QuotationProps) {
+  // The Japan admin can only quote for Japan; the server enforces it too.
+  const isJapan = useRole() === 'japan';
+  const places = isJapan ? ['Japan'] : PLACES;
   const [customerName, setCustomerName] = useState('');
   const [channel, setChannel] = useState('tiktok');
   const [quoteDate, setQuoteDate] = useState(todayLocal());
@@ -131,7 +135,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
         customerName,
         channel,
         quoteDate,
-        orderPlace,
+        orderPlace: isJapan ? 'Japan' : orderPlace,
         items: namedItems.map((it) => ({
           name: it.name.trim(),
           sellingPrice: Number(it.sellingPrice) || 0,
@@ -281,8 +285,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
             </div>
             <div className="order-field">
               <label>Order place</label>
-              <select className="item-input" value={orderPlace} onChange={(e) => setOrderPlace(e.target.value)}>
-                {PLACES.map((p) => (
+              <select className="item-input" value={isJapan ? 'Japan' : orderPlace} disabled={isJapan} onChange={(e) => setOrderPlace(e.target.value)}>
+                {places.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>

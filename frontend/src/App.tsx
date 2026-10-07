@@ -11,6 +11,8 @@ import Orders from './Orders';
 import type { OrderIntent, QuotationForOrder } from './Orders';
 import ExpenseTracker from './ExpenseTracker';
 import Dashboard from './Dashboard';
+import { RoleContext, ROLE_PAGES, ROLE_HOME } from './role';
+import type { Role } from './role';
 import SochicBoard from './SochicBoard';
 
 const API_BASE = '/api';
@@ -19,6 +21,7 @@ export default function App() {
   const [active, setActive] = useState('dashboard'); 
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [role, setRole] = useState<Role>('superadmin');
   // "Make Order" on a quotation hands it to the Orders page, which opens the prefilled form.
   const [menuOpen, setMenuOpen] = useState(false);
   const [orderIntent, setOrderIntent] = useState<OrderIntent | null>(null);
@@ -41,7 +44,13 @@ export default function App() {
   useEffect(() => {
     fetch(`${API_BASE}/auth/check`, { credentials: 'include' })
       .then((res) => res.json())
-      .then((data) => setAuthenticated(!!data.authenticated))
+      .then((data) => {
+        setAuthenticated(!!data.authenticated);
+        if (data.role === 'japan') {
+          setRole('japan');
+          setActive(ROLE_HOME.japan);
+        }
+      })
       .catch(() => setAuthenticated(false))
       .finally(() => setAuthChecked(true));
   }, []);
@@ -56,6 +65,8 @@ export default function App() {
   const handleLogout = async () => {
     await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
     setAuthenticated(false);
+    setRole('superadmin');
+    setActive(ROLE_HOME.superadmin);
   };
 
   if (!authChecked) {
@@ -63,10 +74,22 @@ export default function App() {
   }
 
   if (!authenticated) {
-    return <Login onSuccess={() => setAuthenticated(true)} />;
+    return (
+      <Login
+        onSuccess={(r) => {
+          setRole(r);
+          setActive(ROLE_HOME[r]);
+          setAuthenticated(true);
+        }}
+      />
+    );
   }
 
+  // Only render pages this role may open, whatever `active` says.
+  const page = ROLE_PAGES[role].includes(active) ? active : ROLE_HOME[role];
+
   return (
+    <RoleContext.Provider value={role}>
     <div className="app-shell">
       <header className="mobile-topbar">
         <button
@@ -81,24 +104,25 @@ export default function App() {
         </button>
         <span className="mobile-topbar-title">So Chic Gifts</span>
       </header>
-      <Sidebar active={active} onSelect={handleSelect} onLogout={handleLogout} open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <Sidebar active={page} role={role} onSelect={handleSelect} onLogout={handleLogout} open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main className="app-content">
-        {active === 'dashboard' && <Dashboard onOpenOrder={handleOpenOrder} />}
-        {active === 'board' && (
+        {page === 'dashboard' && <Dashboard onOpenOrder={handleOpenOrder} />}
+        {page === 'board' && (
           <SochicBoard
             onOpenOrder={handleOpenOrder}
             onNewOrder={() => { setOrderIntent({ kind: 'new' }); setActive('orders'); }}
           />
         )}
-        {active === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
-        {active === 'qr' && <QRCodeGenerator />}
-        {active === 'settings' && <Settings />}
-        {active === 'items' && <Items />}
-        {active === 'orders' && (
+        {page === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
+        {page === 'qr' && <QRCodeGenerator />}
+        {page === 'settings' && <Settings />}
+        {page === 'items' && <Items />}
+        {page === 'orders' && (
           <Orders intent={orderIntent} onIntentHandled={() => setOrderIntent(null)} />
         )}
-        {active === 'expenses' && <ExpenseTracker />}
+        {page === 'expenses' && <ExpenseTracker />}
       </main>
     </div>
+    </RoleContext.Provider>
   );
 }

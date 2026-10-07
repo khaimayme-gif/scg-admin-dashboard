@@ -1,4 +1,4 @@
-const { requireAuth } = require('../auth');
+const { requireSuper } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 
 // The list never carries photo_data: it can be hundreds of KB per row. The photo is fetched
@@ -13,7 +13,7 @@ const PHOTO_PATTERN = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)
 
 module.exports = async (req, res, [first, second]) => {
   if (!first && req.method === 'GET') {
-    if (!requireAuth(req, res)) return;
+    if (!requireSuper(req, res)) return;
     await ensureSchema();
     const result = await pool.query(`SELECT ${LIST_COLUMNS} FROM items ORDER BY category, item_code NULLS LAST, name`);
     return res.status(200).json(result.rows);
@@ -21,7 +21,7 @@ module.exports = async (req, res, [first, second]) => {
 
   // Admin-side photo (works for unpublished items too, unlike /api/public/photo).
   if (first === 'photo' && second && req.method === 'GET') {
-    if (!requireAuth(req, res)) return;
+    if (!requireSuper(req, res)) return;
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     await ensureSchema();
     const result = await pool.query('SELECT photo_data, photo_mime FROM items WHERE id = $1 AND photo_data IS NOT NULL', [second]);
@@ -32,7 +32,7 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'save' && req.method === 'POST') {
-    if (!requireAuth(req, res)) return;
+    if (!requireSuper(req, res)) return;
     await ensureSchema();
     const { id, category, name, menuPrice, originalCost, itemCode, description, itemGroup, published, photo } = req.body || {};
     if (!category || !name || menuPrice === undefined) {
@@ -85,7 +85,7 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'delete' && second && req.method === 'DELETE') {
-    if (!requireAuth(req, res)) return;
+    if (!requireSuper(req, res)) return;
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     await ensureSchema();
     await pool.query('DELETE FROM items WHERE id = $1', [second]);

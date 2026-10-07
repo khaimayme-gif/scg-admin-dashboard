@@ -50,6 +50,7 @@ function ensureSchema() {
       ALTER TABLE qr_codes
         ADD COLUMN IF NOT EXISTS card_theme TEXT,
         ADD COLUMN IF NOT EXISTS dot_color TEXT,
+        ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT 'superadmin',
         ADD COLUMN IF NOT EXISTS show_handle BOOLEAN NOT NULL DEFAULT false
     `))
     .then(() => pool.query(`

@@ -1,4 +1,4 @@
-const { requireAuth } = require('../auth');
+const { requireAuth, requireSuper } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 
 module.exports = async (req, res, [first]) => {
@@ -15,7 +15,7 @@ module.exports = async (req, res, [first]) => {
   }
 
   if (first === 'save' && req.method === 'POST') {
-    if (!requireAuth(req, res)) return;
+    if (!requireSuper(req, res)) return;
     await ensureSchema();
     const { rateThbToJpy, rateThbToMmk, rateMmkToJpy } = req.body || {};
     await pool.query(
