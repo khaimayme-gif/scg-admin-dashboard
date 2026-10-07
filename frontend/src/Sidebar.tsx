@@ -14,12 +14,8 @@ const MODULES = [
   { id: 'items', label: 'Items', ready: true },
   { id: 'qr', label: 'QR Code Generator', ready: true },
   { id: 'orders', label: 'Orders', ready: true },
-  { id: 'customers', label: 'Customer Database', ready: false },
   { id: 'templates', label: 'Template Library', ready: false },
-  { id: 'gifts', label: 'Gift Packages', ready: false },
-  { id: 'delivery', label: 'Delivery Schedule', ready: false },
   { id: 'expenses', label: 'Expense Tracker', ready: true },
-  { id: 'profit', label: 'Monthly Profit', ready: false },
   { id: 'settings', label: 'Settings', ready: true },
 ];
 
