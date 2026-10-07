@@ -1058,3 +1058,63 @@ body {
 
 .quotations-compact th:nth-child(1), .quotations-compact td:nth-child(1) { width: 120px; }
 .orders-compact th, .orders-compact td { box-sizing: border-box; }
+.status-partially_paid { background: #FBEBCB; color: #82601A; }
+.status-pending { background: #FFE4EA; color: #B3283F; }
+
+/* So Chic Board */
+.board-page { max-width: none; }
+.board-tools { margin-bottom: 18px; }
+.board-search { width: 100%; max-width: 360px; }
+.board-tabs { display: none; }
+.board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.board-col { background: #FFF8FA; border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-height: 160px; transition: border-color 0.15s ease, background 0.15s ease; }
+.board-col.is-over { border-color: var(--pink); background: #FFF0F4; }
+.board-col-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 2px; }
+.board-col-head h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.board-count { min-width: 24px; text-align: center; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--ink); }
+.board-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.board-empty { font-size: 13px; color: var(--muted); text-align: center; padding: 18px 8px; list-style: none; }
+.board-more { width: 100%; margin: 12px 0 0; }
+.ticket { background: #fff; border: 1px solid var(--line); border-radius: 12px; cursor: grab; transition: border-color 0.15s ease, opacity 0.15s ease; }
+.ticket:hover { border-color: var(--blush-deep); }
+.ticket.is-dragging { opacity: 0.4; }
+.ticket-body { width: 100%; display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 12px 12px 6px; border: none; background: none; font-family: inherit; color: var(--ink); cursor: pointer; }
+.ticket-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ticket-id { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--pink); }
+.ticket-top .status-pill { font-size: 11px; padding: 1px 9px; }
+.ticket-title { font-weight: 600; font-size: 14px; }
+.ticket-items { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ticket-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+.ticket-date { font-weight: 500; }
+.ticket-date.is-late { color: var(--error); }
+.ticket-date.is-none { font-weight: 400; }
+.ticket-move { margin: 0 12px 10px; width: calc(100% - 24px); padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-family: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.ticket-modal { max-width: 640px; }
+.ticket-modal .modal-header { align-items: flex-start; }
+.ticket-modal-title { margin: 2px 0 0; font-size: 20px; font-weight: 600; }
+.ticket-stage-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 20px; padding: 3px; background: var(--blush); border-radius: 10px; }
+.stage-btn { flex: 1; padding: 8px 10px; border: none; border-radius: 8px; background: none; font-family: inherit; font-size: 13px; font-weight: 500; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.stage-btn.is-active { background: #fff; color: var(--pink); font-weight: 600; }
+.ticket-modal .detail-items { margin: 18px 0; }
+.comments { margin-top: 22px; padding-top: 18px; border-top: 1px dashed var(--line); }
+.comment-list { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; gap: 10px; max-height: 260px; overflow-y: auto; }
+.comment { background: #FFF8FA; border-radius: 10px; padding: 10px 12px; }
+.comment p { margin: 0 0 4px; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+.comment-meta { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.comment-delete { border: none; background: none; font-family: inherit; font-size: 11px; color: var(--muted); cursor: pointer; }
+.comment-delete:hover { color: var(--error); }
+@media (max-width: 1240px) { .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 860px) {
+  .board-tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; padding-bottom: 2px; }
+  .board-tab { flex: 1 0 auto; padding: 9px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-family: inherit; font-size: 13px; color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .board-tab span { margin-left: 4px; color: var(--muted); }
+  .board-tab.is-active { background: var(--pink); border-color: var(--pink); color: #fff; }
+  .board-tab.is-active span { color: #fff; }
+  .board { display: block; }
+  .board-col { display: none; padding: 10px; }
+  .board-col.is-mobile-active { display: block; }
+  .board-col-head { display: none; }
+  .ticket { cursor: default; }
+  .ticket-modal { min-height: 0; }
+  .stage-btn { padding: 8px 6px; font-size: 12px; }
+}

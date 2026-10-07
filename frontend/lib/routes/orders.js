@@ -1,14 +1,15 @@
 const { requireAuth } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 
-const STATUSES = ['pending', 'paid', 'in_progress', 'delivered', 'cancelled'];
+// Payment status. 'cancelled' only survives on orders cancelled before the board existed.
+const STATUSES = ['pending', 'partially_paid', 'paid', 'cancelled'];
 const CURRENCIES = ['THB', 'JPY', 'MMK'];
 const CHANNELS = ['tiktok', 'facebook'];
 
 const ORDER_COLUMNS = `id, order_no, quotation_id, customer_name, country, channel,
   to_char(order_date, 'YYYY-MM-DD') AS order_date, status, currency, selling_price, cost, revenue,
   items_json, notes, recipient, recipient_phone, to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
-  delivery_address, delivery_note`;
+  delivery_address, delivery_note, board_stage`;
 
 const parse = (row) => ({ ...row, items: JSON.parse(row.items_json) });
 

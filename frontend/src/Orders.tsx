@@ -46,7 +46,8 @@ export interface QuotationForOrder {
 
 export type OrderIntent =
   | { kind: 'fromQuotation'; quotation: QuotationForOrder }
-  | { kind: 'edit'; orderId: number };
+  | { kind: 'edit'; orderId: number }
+  | { kind: 'new' };
 
 interface Totals {
   orderCount: number;
@@ -102,11 +103,12 @@ interface FormState {
   deliveryNote: string;
 }
 
+// Payment status only. Where an order is in its delivery journey lives on So Chic Board.
+// 'cancelled' is kept for orders cancelled before the board existed; it can't be picked anymore.
 const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
+  pending: 'Unpaid',
+  partially_paid: 'Partially paid',
   paid: 'Paid',
-  in_progress: 'In progress',
-  delivered: 'Delivered',
   cancelled: 'Cancelled',
 };
 
@@ -120,6 +122,7 @@ const fmt = (n: number) => Math.round(n).toLocaleString();
 // everything past "pending" counts as paid.
 const paymentFor = (status: string): { label: string; tone: 'paid' | 'pending' | 'cancelled' } => {
   if (status === 'pending') return { label: 'awaiting payment', tone: 'pending' };
+  if (status === 'partially_paid') return { label: 'partially paid', tone: 'pending' };
   if (status === 'cancelled') return { label: 'cancelled', tone: 'cancelled' };
   return { label: 'fully paid', tone: 'paid' };
 };
@@ -382,6 +385,10 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
       setFormError('');
       setForm(existing ? formFromOrder(existing) : formFromQuotation(intent.quotation));
       setShowForm(true);
+    } else if (intent.kind === 'new') {
+      setFormError('');
+      setForm(emptyForm());
+      setShowForm(true);
     } else {
       const order = orders.find((o) => o.id === intent.orderId);
       if (order) {
@@ -619,13 +626,13 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                 />
               </div>
               <div className="order-field">
-                <label>Status</label>
+                <label>Payment</label>
                 <select
                   className="item-input"
                   value={form.status}
                   onChange={(e) => update('status', e.target.value)}
                 >
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  {Object.entries(STATUS_LABELS).filter(([value]) => value !== 'cancelled' || form.status === 'cancelled').map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
@@ -844,7 +851,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                     <tr>
                       <th>Order</th>
                       <th>Customer</th>
-                      <th>Status</th>
+                      <th>Payment</th>
                       <th className="num-col">Selling price</th>
                       <th></th>
                     </tr>
