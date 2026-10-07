@@ -298,6 +298,7 @@ export default function ExpenseTracker() {
             {expenses.length === 0 ? (
               <p className="empty-state">No expenses recorded yet.</p>
             ) : (
+              <div className="orders-table-wrap">
               <table className="items-table">
                 <thead>
                   <tr>
@@ -334,6 +335,7 @@ export default function ExpenseTracker() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </>

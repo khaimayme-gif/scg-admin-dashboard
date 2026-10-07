@@ -710,6 +710,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                       type="number"
                       className="item-input order-item-qty"
                       min="1"
+                      placeholder="Qty"
                       value={line.quantity}
                       onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                       aria-label="Quantity"
