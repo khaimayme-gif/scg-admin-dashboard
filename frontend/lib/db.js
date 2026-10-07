@@ -90,6 +90,18 @@ function ensureSchema() {
         ADD COLUMN IF NOT EXISTS photo_mime TEXT,
         ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT TRUE
     `))
+    // Item types (Cake, Bouquet, ...) are managed on the Items page. `code` is the Item ID prefix.
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS item_types (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        code TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`))
+    .then(() => pool.query(`
+      INSERT INTO item_types (name, code)
+      SELECT v.name, v.code FROM (VALUES ('Cake', 'CK'), ('Bouquet', 'BQ'), ('Balloons', 'BL')) AS v(name, code)
+      WHERE NOT EXISTS (SELECT 1 FROM item_types)`))
     .then(() => pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS items_item_code_unique
         ON items (item_code) WHERE item_code IS NOT NULL

@@ -944,3 +944,21 @@ body {
 .qr-stage.is-dark { background: #3A2A2F; border-radius: 12px; }
 .theme-swatch[aria-label="White"] { border-color: #E4D8DC; }
 .calc-layout > * { min-width: 0; }
+
+/* Items: header buttons, item types */
+.header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.header-secondary-btn { background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.header-secondary-btn:hover { background: var(--blush); }
+.type-field { margin-bottom: 16px; }
+.types-card { max-width: 520px; }
+.types-list { list-style: none; margin: 14px 0; padding: 0; }
+.types-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid #F7F0F2; }
+.types-row:last-child { border-bottom: 1px solid #F7F0F2; }
+.types-code { min-width: 44px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: var(--pink); }
+.types-name { flex: 1; font-weight: 500; }
+.types-count { font-size: 12px; color: var(--muted); }
+.types-edit { margin-top: 8px; }
+@media (max-width: 860px) {
+  .header-actions { flex-direction: column-reverse; align-items: stretch; gap: 8px; }
+  .header-secondary-btn { padding: 8px 14px; font-size: 13px; }
+}

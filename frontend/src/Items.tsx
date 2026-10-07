@@ -15,6 +15,14 @@ interface Item {
   photo_version: number;
 }
 
+interface ItemType {
+  id: number;
+  name: string;
+  code: string;
+  next_code: string;
+  item_count: number;
+}
+
 interface FormState {
   id?: number;
   itemCode: string;
@@ -30,7 +38,6 @@ interface FormState {
   existingPhotoUrl: string | null;
 }
 
-const SUGGESTED_CATEGORIES = ['Cake', 'Bouquet', 'Balloons'];
 const emptyForm = (): FormState => ({
   itemCode: '', category: '', name: '', description: '', itemGroup: '', menuPrice: '', originalCost: '',
   published: true, photo: undefined, existingPhotoUrl: null,
@@ -70,9 +77,114 @@ function compressImage(file: File, maxSide = 900, quality = 0.82): Promise<strin
   });
 }
 
+function TypesModal({ types, onClose, onChanged }: { types: ItemType[]; onClose: () => void; onChanged: () => void }) {
+  const [editing, setEditing] = useState<{ id?: number; name: string; code: string } | null>(null);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const suggestCode = (name: string) => name.replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase();
+
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    setError('');
+    try {
+      const res = await apiFetch('/item-types/save', jsonBody(editing));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Could not save the type.');
+        return;
+      }
+      setEditing(null);
+      onChanged();
+    } catch {
+      // a 401 has already sent us back to login
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (t: ItemType) => {
+    if (!window.confirm(`Delete the type "${t.name}"?`)) return;
+    setError('');
+    try {
+      const res = await apiFetch(`/item-types/delete/${t.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Could not delete the type.');
+        return;
+      }
+      onChanged();
+    } catch {
+      // a 401 has already sent us back to login
+    }
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card types-card">
+        <div className="modal-header">
+          <h2 className="panel-label">Item types</h2>
+          <button className="item-remove" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        <p className="stat-sub">
+          A type sets where an item goes on the website menu, and the first letters of its Item ID
+          (code CK gives CK01, CK02, ...). Changing a code doesn’t change IDs already given out.
+        </p>
+
+        <ul className="types-list">
+          {types.map((t) => (
+            <li className="types-row" key={t.id}>
+              <span className="types-code">{t.code}</span>
+              <span className="types-name">{t.name}</span>
+              <span className="types-count">{t.item_count} {t.item_count === 1 ? 'item' : 'items'}</span>
+              <button className="order-edit-btn" onClick={() => setEditing({ id: t.id, name: t.name, code: t.code })}>Edit</button>
+              <button className="item-remove" onClick={() => remove(t)} aria-label={`Delete ${t.name}`}>×</button>
+            </li>
+          ))}
+          {types.length === 0 && <li className="empty-state">No types yet.</li>}
+        </ul>
+
+        {editing ? (
+          <div className="types-edit">
+            <div className="order-form-grid">
+              <div className="order-field">
+                <label>Type name</label>
+                <input className="item-input" placeholder="e.g. Cake" value={editing.name} autoFocus
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setEditing((prev) => prev && {
+                      ...prev,
+                      name,
+                      code: prev.id || prev.code !== suggestCode(prev.name) ? prev.code : suggestCode(name),
+                    });
+                  }} />
+              </div>
+              <div className="order-field">
+                <label>ID code (1–4 letters)</label>
+                <input className="item-input" placeholder="e.g. CK" maxLength={4} value={editing.code}
+                  onChange={(e) => setEditing((prev) => prev && { ...prev, code: e.target.value.toUpperCase() })} />
+              </div>
+            </div>
+            <div className="order-form-actions">
+              <button className="save-btn" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save type'}</button>
+              <button className="add-item-btn" onClick={() => { setEditing(null); setError(''); }} disabled={saving}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button className="add-item-btn" onClick={() => setEditing({ name: '', code: '' })}>Add type</button>
+        )}
+        {error && <p className="error-text">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function Items() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
+  const [types, setTypes] = useState<ItemType[]>([]);
+  const [showTypes, setShowTypes] = useState(false);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -85,9 +197,22 @@ export default function Items() {
       .catch(() => {})
       .finally(() => setLoading(false));
 
+  const loadTypes = () =>
+    apiFetch('/item-types')
+      .then((res) => res.json())
+      .then((data) => setTypes(Array.isArray(data) ? data : []))
+      .catch(() => {});
+
   useEffect(() => {
     loadItems();
+    loadTypes();
   }, []);
+
+  // Picking a type fills in the next free Item ID for it (CK01, CK02, ...). Still editable.
+  const chooseType = (name: string) => {
+    const type = types.find((t) => t.name === name);
+    setForm((prev) => (prev ? { ...prev, category: name, itemCode: type ? type.next_code : prev.itemCode } : prev));
+  };
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -129,8 +254,8 @@ export default function Items() {
 
   const handleSubmit = async () => {
     if (!form) return;
-    if (!form.name.trim() || !form.category.trim() || form.menuPrice === '') {
-      setFormError('Category, name and selling price are required.');
+    if (!form.category.trim() || !form.name.trim() || form.menuPrice === '') {
+      setFormError('Item type, name and selling price are required.');
       return;
     }
     setSaving(true);
@@ -154,7 +279,7 @@ export default function Items() {
         return;
       }
       setForm(null);
-      await loadItems();
+      await Promise.all([loadItems(), loadTypes()]);
     } catch {
       // a 401 has already sent us back to login
     } finally {
@@ -172,13 +297,19 @@ export default function Items() {
     }
     setForm(null);
     loadItems();
+    loadTypes();
   };
 
   const grouped = items.reduce<Record<string, Item[]>>((acc, item) => {
     (acc[item.category] ||= []).push(item);
     return acc;
   }, {});
-  const categories = Object.keys(grouped);
+  // Follow the order the types were created in; anything not in the list (older items) goes last.
+  const typeOrder = (name: string) => {
+    const i = types.findIndex((t) => t.name === name);
+    return i === -1 ? types.length : i;
+  };
+  const categories = Object.keys(grouped).sort((a, b) => typeOrder(a) - typeOrder(b));
 
   const previewSrc = form ? (form.photo === undefined ? form.existingPhotoUrl : form.photo) : null;
   const price = Number(form?.menuPrice) || 0;
@@ -194,7 +325,10 @@ export default function Items() {
             Your catalog. Published items show up on the So Chic Gifts website menu, with the photo, name and selling price.
           </p>
         </div>
-        <button className="new-order-btn" onClick={openNew}>New Item</button>
+        <div className="header-actions">
+          <button className="header-secondary-btn" onClick={() => setShowTypes(true)}>Item Types</button>
+          <button className="new-order-btn" onClick={openNew}>New Item</button>
+        </div>
       </header>
 
       {loading ? (
@@ -242,6 +376,14 @@ export default function Items() {
         </>
       )}
 
+      {showTypes && (
+        <TypesModal
+          types={types}
+          onClose={() => setShowTypes(false)}
+          onChanged={() => { loadTypes(); loadItems(); }}
+        />
+      )}
+
       {form && (
         <div className="modal-backdrop">
           <div className="modal-card">
@@ -250,6 +392,19 @@ export default function Items() {
               <button className="item-remove" onClick={closeForm} aria-label="Close">×</button>
             </div>
 
+            <div className="order-field type-field">
+              <label>Item type</label>
+              <select className="item-input" value={form.category} onChange={(e) => chooseType(e.target.value)}>
+                <option value="" disabled>Choose an item type…</option>
+                {types.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                {form.category && !types.some((t) => t.name === form.category) && (
+                  <option value={form.category}>{form.category}</option>
+                )}
+              </select>
+              {types.length === 0 && <p className="stat-sub">No item types yet. Add some with “Item Types” first.</p>}
+            </div>
+
+            {form.category && (
             <div className="photo-field">
               <div className="photo-preview">
                 {previewSrc ? <img src={previewSrc} alt="Item preview" /> : <span>No photo yet</span>}
@@ -273,20 +428,14 @@ export default function Items() {
                 <p className="stat-sub">Square photos look best. Large images are shrunk automatically.</p>
               </div>
             </div>
+            )}
 
+            {form.category && (
             <div className="order-form-grid">
               <div className="order-field">
-                <label>Item ID</label>
+                <label>Item ID (auto, you can change it)</label>
                 <input className="item-input" placeholder="e.g. CK01" value={form.itemCode}
                   onChange={(e) => update('itemCode', e.target.value)} />
-              </div>
-              <div className="order-field">
-                <label>Category</label>
-                <input className="item-input" placeholder="Cake, Bouquet, Balloons…" list="item-categories"
-                  value={form.category} onChange={(e) => update('category', e.target.value)} />
-                <datalist id="item-categories">
-                  {[...new Set([...SUGGESTED_CATEGORIES, ...categories])].map((c) => <option key={c} value={c} />)}
-                </datalist>
               </div>
               <div className="order-field">
                 <label>Group (optional)</label>
@@ -314,6 +463,7 @@ export default function Items() {
                   onChange={(e) => update('originalCost', e.target.value)} />
               </div>
             </div>
+            )}
 
             {profit !== null && (
               <p className={`order-profit ${profit < 0 ? 'profit-negative' : ''}`}>
