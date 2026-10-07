@@ -92,6 +92,14 @@ function ensureSchema() {
         ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT TRUE,
         ADD COLUMN IF NOT EXISTS photo_name TEXT
     `))
+    // Thailand and Japan have separate catalogs: every item belongs to one country.
+    .then(() => pool.query(`
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS country TEXT NOT NULL DEFAULT 'thailand'`))
+    // Item IDs only have to be unique inside a country (both can have a CK01).
+    .then(() => pool.query(`DROP INDEX IF EXISTS items_item_code_unique`))
+    .then(() => pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS items_country_item_code_unique
+        ON items (country, item_code) WHERE item_code IS NOT NULL`))
     // Item types (Cake, Bouquet, ...) are managed on the Items page. `code` is the Item ID prefix.
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS item_types (
@@ -120,10 +128,7 @@ function ensureSchema() {
       ) AS v(name, code)
       WHERE EXISTS (SELECT 1 FROM flag)
       ON CONFLICT DO NOTHING`))
-    .then(() => pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS items_item_code_unique
-        ON items (item_code) WHERE item_code IS NOT NULL
-    `))
+
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,
