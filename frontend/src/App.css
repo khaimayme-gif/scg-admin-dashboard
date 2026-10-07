@@ -1136,3 +1136,10 @@ body {
   .dash-filters .month-select { margin-left: 0; width: 100%; }
 }
 .import-problems { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+
+/* Sidebar sub-menus */
+.sidebar-group.has-active { color: var(--pink); opacity: 1; font-weight: 500; }
+.sidebar-caret { font-size: 11px; transition: transform 0.15s ease; }
+.sidebar-caret.is-open { transform: rotate(180deg); }
+.sidebar-sublist { list-style: none; margin: 2px 0 4px 14px; padding: 0 0 0 10px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.sidebar-subitem { padding: 8px 12px; font-size: 13px; }
