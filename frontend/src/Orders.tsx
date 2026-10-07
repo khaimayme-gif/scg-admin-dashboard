@@ -3,6 +3,7 @@ import { apiFetch, jsonBody } from './api';
 import { renderOrderPng } from './orderImage';
 import { downloadBlob } from './quotationImage';
 import { useRole } from './role';
+import { platformFeeJpy } from './platformFee';
 
 interface OrderItem {
   name: string;
@@ -32,6 +33,7 @@ interface Order {
   delivery_date: string | null;
   delivery_address: string | null;
   delivery_note: string | null;
+  platform_fee_jpy: number | null; // Japan orders only
 }
 
 // What the Quotation page hands over when the admin clicks "Make Order".
@@ -55,6 +57,7 @@ interface Totals {
   sellingThb: number;
   costThb: number;
   revenueThb: number;
+  platformFeeThb?: number; // SochicGifts fees on Japan orders
 }
 
 interface MonthStats extends Totals {
@@ -139,7 +142,7 @@ const monthLabel = (ym: string) => {
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 };
 
-function StatCards({ totals, cancelledCount }: { totals: Totals; cancelledCount: number }) {
+function StatCards({ totals, cancelledCount, showFees }: { totals: Totals; cancelledCount: number; showFees: boolean }) {
   return (
     <div className="stat-grid">
       <div className="stat-card">
@@ -163,6 +166,13 @@ function StatCards({ totals, cancelledCount }: { totals: Totals; cancelledCount:
         </span>
         <span className="stat-sub">Collected minus cost</span>
       </div>
+      {showFees && (totals.platformFeeThb ?? 0) > 0 && (
+        <div className="stat-card">
+          <span className="stat-label">Platform fees</span>
+          <span className="stat-value">{fmt(totals.platformFeeThb ?? 0)} THB</span>
+          <span className="stat-sub">From Japan orders, added to SochicGifts revenue</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -279,6 +289,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [rates, setRates] = useState<{ thbToJpy: number; thbToMmk: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -315,6 +326,10 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
 
   useEffect(() => {
     loadAll();
+    apiFetch('/settings')
+      .then((res) => res.json())
+      .then((s) => setRates(s.rateThbToJpy && s.rateThbToMmk ? { thbToJpy: s.rateThbToJpy, thbToMmk: s.rateThbToMmk } : null))
+      .catch(() => {});
     apiFetch('/items')
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setCatalog(Array.isArray(data) ? data : []))
@@ -502,6 +517,15 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
     0
   );
   const formRevenue = Number(form.sellingPrice || 0) - formCost;
+  // Live preview of the SochicGifts platform fee (Japan orders). The server recalculates it on save.
+  const formFeeJpy = (() => {
+    const selling = Number(form.sellingPrice) || 0;
+    if (form.currency === 'JPY') return platformFeeJpy(selling);
+    if (!rates) return null;
+    if (form.currency === 'THB') return platformFeeJpy(selling * rates.thbToJpy);
+    if (form.currency === 'MMK') return platformFeeJpy((selling / rates.thbToMmk) * rates.thbToJpy);
+    return null;
+  })();
 
   // Every month that has orders, plus the current month so it is always selectable.
   const monthOptions = Array.from(
@@ -555,9 +579,9 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                 )}
               </div>
               {view === 'monthly' ? (
-                <StatCards totals={monthTotals} cancelledCount={monthTotals.cancelledCount} />
+                <StatCards totals={monthTotals} cancelledCount={monthTotals.cancelledCount} showFees={!isJapan} />
               ) : (
-                <StatCards totals={stats} cancelledCount={stats.cancelledCount} />
+                <StatCards totals={stats} cancelledCount={stats.cancelledCount} showFees={!isJapan} />
               )}
               {stats.unconverted > 0 && (
                 <p className="error-text">
@@ -815,6 +839,14 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                   {fmt(formRevenue)} {form.currency}
                 </div>
               </div>
+              {(isJapan ? 'Japan' : form.country).trim().toLowerCase() === 'japan' && (
+                <div className="order-field">
+                  <label>Platform fee (auto, in yen)</label>
+                  <div className="order-profit">
+                    {formFeeJpy === null ? 'Set rates in Settings' : `${fmt(formFeeJpy)} Yen`}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="order-field">
@@ -898,6 +930,9 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                                   <dl className="detail-grid">
                                     <div><dt>Country</dt><dd>{o.country || '—'}</dd></div>
                                     <div><dt>Channel</dt><dd>{o.channel ? (CHANNELS[o.channel] ?? o.channel) : '—'}</dd></div>
+                                    {o.platform_fee_jpy !== null && (
+                                      <div><dt>Platform fee</dt><dd className="items-price-cell">{fmt(o.platform_fee_jpy)} Yen</dd></div>
+                                    )}
                                     <div><dt>Cost</dt><dd className="items-price-cell">{fmt(o.cost)} {o.currency}</dd></div>
                                     <div>
                                       <dt>Revenue</dt>

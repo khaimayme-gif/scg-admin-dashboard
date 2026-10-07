@@ -1,5 +1,6 @@
 const { requireAuth } = require('../auth');
 const { pool, ensureSchema } = require('../db');
+const { platformFeeJpy } = require('../platform-fee');
 
 const CHANNELS = ['tiktok', 'facebook'];
 const PLACES = ['Thailand', 'Japan', 'Myanmar'];
@@ -34,7 +35,7 @@ module.exports = async (req, res, [first, second]) => {
   if (!first && req.method === 'GET') {
     const result = await pool.query(
       `SELECT q.id, q.quote_no, q.customer_name, q.channel, to_char(q.quote_date, 'YYYY-MM-DD') AS quote_date,
-              q.order_place, q.items_json, q.total_thb, q.original_thb, q.revenue_thb, q.total_mmk, q.total_jpy,
+              q.order_place, q.items_json, q.total_thb, q.original_thb, q.revenue_thb, q.total_mmk, q.total_jpy, q.platform_fee_jpy,
               o.id AS order_id, o.order_no
        FROM quotations q
        LEFT JOIN orders o ON o.quotation_id = q.id
@@ -76,6 +77,8 @@ module.exports = async (req, res, [first, second]) => {
     const s = settings.rows[0] || {};
     const totalMmk = s.rate_thb_to_mmk ? Math.round(totalThb * s.rate_thb_to_mmk) : null;
     const totalJpy = s.rate_thb_to_jpy ? Math.round(totalThb * s.rate_thb_to_jpy) : null;
+    // Japan quotations carry the SochicGifts platform fee, worked out from the yen total.
+    const platformFee = orderPlace === 'Japan' && totalJpy !== null ? platformFeeJpy(totalJpy) : null;
 
     const client = await pool.connect();
     let row;
@@ -84,10 +87,10 @@ module.exports = async (req, res, [first, second]) => {
       const quoteNo = await nextQuoteNo(client);
       const result = await client.query(
         `INSERT INTO quotations (quote_no, customer_name, channel, quote_date, order_place, items_json,
-                                 total_thb, original_thb, revenue_thb, total_mmk, total_jpy)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                                 total_thb, original_thb, revenue_thb, total_mmk, total_jpy, platform_fee_jpy)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING id, quote_no, customer_name, channel, to_char(quote_date, 'YYYY-MM-DD') AS quote_date, order_place,
-                   items_json, total_thb, original_thb, revenue_thb, total_mmk, total_jpy,
+                   items_json, total_thb, original_thb, revenue_thb, total_mmk, total_jpy, platform_fee_jpy,
                    NULL::integer AS order_id, NULL::text AS order_no`,
         [
           quoteNo,
@@ -101,6 +104,7 @@ module.exports = async (req, res, [first, second]) => {
           revenueThb,
           totalMmk,
           totalJpy,
+          platformFee,
         ]
       );
       await client.query('COMMIT');
