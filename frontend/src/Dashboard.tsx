@@ -12,6 +12,7 @@ interface Order {
   customer_name: string;
   recipient: string | null;
   status: string;
+  board_stage: string;
   currency: string;
   selling_price: number;
   order_date: string;
@@ -37,12 +38,18 @@ interface ExpenseStats {
   monthlyRunRateThb: number;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
+const PAYMENT_LABELS: Record<string, string> = {
+  pending: 'Unpaid',
+  partially_paid: 'Partially paid',
   paid: 'Paid',
-  in_progress: 'In progress',
-  delivered: 'Delivered',
   cancelled: 'Cancelled',
+};
+
+const STAGE_LABELS: Record<string, string> = {
+  todo: 'To do',
+  in_progress: 'In progress',
+  done: 'Done',
+  closed: 'Closed',
 };
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
@@ -125,9 +132,11 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
   const delta = revenuePrev > 0 ? Math.round(((revenueNow - revenuePrev) / revenuePrev) * 100) : null;
   const expensesNow = expenses ? expenses.oneTimeThisMonthThb + expenses.monthlyRunRateThb : 0;
 
-  // Orders still to deliver: not cancelled, not delivered, with a delivery date. Overdue ones
-  // (date already passed) are pulled out so they don't get lost.
-  const open = orders.filter((o) => o.status !== 'cancelled' && o.status !== 'delivered');
+  // Orders still to deliver: on So Chic Board in To do or In progress. Overdue ones (date
+  // already passed) are pulled out so they don't get lost.
+  const open = orders.filter(
+    (o) => o.status !== 'cancelled' && (o.board_stage === 'todo' || o.board_stage === 'in_progress')
+  );
   const scheduled = open.filter((o) => o.delivery_date);
   const overdue = scheduled
     .filter((o) => daysFromToday(o.delivery_date as string) < 0)
@@ -137,7 +146,7 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
     .sort((a, b) => (a.delivery_date as string).localeCompare(b.delivery_date as string));
   const unscheduled = open.filter((o) => !o.delivery_date);
   const next7 = upcoming.filter((o) => daysFromToday(o.delivery_date as string) <= 7).length;
-  const awaitingPayment = orders.filter((o) => o.status === 'pending').length;
+  const awaitingPayment = open.filter((o) => o.status === 'pending' || o.status === 'partially_paid').length;
 
   const series = Array.from({ length: months }, (_, i) => {
     const month = shiftMonth(thisMonth, i - (months - 1));
@@ -162,7 +171,8 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
           {o.delivery_address && <span className="dash-order-where">{o.delivery_address}</span>}
         </span>
         <span className="dash-order-side">
-          <span className={`status-pill status-${o.status}`}>{STATUS_LABELS[o.status] ?? o.status}</span>
+          <span className="status-pill">{STAGE_LABELS[o.board_stage] ?? o.board_stage}</span>
+          <span className={`status-pill status-${o.status}`}>{PAYMENT_LABELS[o.status] ?? o.status}</span>
           <span className="dash-order-amount">{fmt(o.selling_price)} {o.currency}</span>
         </span>
       </button>

@@ -215,6 +215,37 @@ function ensureSchema() {
     `)).then(() => pool.query(`
       CREATE INDEX IF NOT EXISTS expenses_expense_date ON expenses (expense_date DESC)
     `))
+    // So Chic Board: every order is a ticket in one of todo / in_progress / done / closed.
+    // `status` on an order now only says how much has been paid (pending = unpaid,
+    // partially_paid, paid); delivery progress lives in board_stage.
+    .then(() => pool.query(`
+      ALTER TABLE orders
+        ADD COLUMN IF NOT EXISTS board_stage TEXT NOT NULL DEFAULT 'todo',
+        ADD COLUMN IF NOT EXISTS board_position DOUBLE PRECISION NOT NULL DEFAULT (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)
+    `))
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS schema_flags (name TEXT PRIMARY KEY)`))
+    .then(() => pool.query(`
+      -- One time: all orders that exist when the board is introduced go to Closed, and the old
+      -- in_progress / delivered statuses (now board stages) become plain "paid". Cancelled
+      -- orders keep their status so they stay out of the totals.
+      WITH flag AS (
+        INSERT INTO schema_flags (name) VALUES ('board_v1') ON CONFLICT DO NOTHING RETURNING 1
+      )
+      UPDATE orders SET
+        board_stage = 'closed',
+        board_position = EXTRACT(EPOCH FROM COALESCE(created_at, NOW())) * 1000,
+        status = CASE WHEN status IN ('in_progress', 'delivered') THEN 'paid' ELSE status END
+      WHERE EXISTS (SELECT 1 FROM flag)`))
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS board_comments (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`))
+    .then(() => pool.query(`
+      CREATE INDEX IF NOT EXISTS board_comments_order ON board_comments (order_id, created_at)`))
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,

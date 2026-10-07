@@ -11,6 +11,7 @@ import Orders from './Orders';
 import type { OrderIntent, QuotationForOrder } from './Orders';
 import ExpenseTracker from './ExpenseTracker';
 import Dashboard from './Dashboard';
+import SochicBoard from './SochicBoard';
 
 const API_BASE = '/api';
 
@@ -83,6 +84,12 @@ export default function App() {
       <Sidebar active={active} onSelect={handleSelect} onLogout={handleLogout} open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main className="app-content">
         {active === 'dashboard' && <Dashboard onOpenOrder={handleOpenOrder} />}
+        {active === 'board' && (
+          <SochicBoard
+            onOpenOrder={handleOpenOrder}
+            onNewOrder={() => { setOrderIntent({ kind: 'new' }); setActive('orders'); }}
+          />
+        )}
         {active === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {active === 'qr' && <QRCodeGenerator />}
         {active === 'settings' && <Settings />}
