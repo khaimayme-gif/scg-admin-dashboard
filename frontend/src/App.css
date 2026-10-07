@@ -1001,12 +1001,12 @@ body {
 /* Orders table: compact rows, the rest behind a Details button */
 .orders-table-wrap:has(.orders-compact) { overflow-x: visible; }
 .orders-table-wrap .orders-compact { min-width: 0; table-layout: fixed; width: 100%; }
-.orders-compact th:nth-child(1), .orders-compact td:nth-child(1) { width: 200px; }
+.orders-compact th:nth-child(1), .orders-compact td:nth-child(1) { width: 176px; }
 .orders-compact .cell-main { text-overflow: clip; }
 .orders-compact td:nth-child(2) .cell-main { text-overflow: ellipsis; }
-.orders-compact th:nth-child(3), .orders-compact td:nth-child(3) { width: 120px; }
-.orders-compact th:nth-child(4), .orders-compact td:nth-child(4) { width: 130px; padding-right: 18px; }
-.orders-compact th:nth-child(5), .orders-compact td:nth-child(5) { width: 118px; }
+.orders-compact th:nth-child(3), .orders-compact td:nth-child(3) { width: 108px; }
+.orders-compact th:nth-child(4), .orders-compact td:nth-child(4) { width: 118px; padding-right: 14px; }
+.orders-compact th:nth-child(5), .orders-compact td:nth-child(5) { width: 108px; }
 .orders-compact .num-col { text-align: right; }
 .orders-compact td { vertical-align: middle; }
 .cell-main { display: block; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1043,3 +1043,18 @@ body {
   .orders-compact .detail-row { display: block; }
   .orders-compact .detail-row td { display: block; padding: 4px 6px 18px; }
 }
+
+/* Expenses table has 4 columns: the shared compact rules assume 5 */
+.expenses-compact th:nth-child(1), .expenses-compact td:nth-child(1) { width: auto; }
+.expenses-compact th:nth-child(2), .expenses-compact td:nth-child(2) { width: 120px; }
+.expenses-compact th:nth-child(3), .expenses-compact td:nth-child(3) { width: 130px; padding-right: 18px; }
+.expenses-compact th:nth-child(4), .expenses-compact td:nth-child(4) { width: 118px; }
+@media (max-width: 860px) {
+  .expenses-compact td:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .expenses-compact td:nth-child(2) { grid-column: 2; grid-row: 1; text-align: right; }
+  .expenses-compact td:nth-child(3) { grid-column: 1; grid-row: 2; }
+  .expenses-compact td:nth-child(4) { grid-column: 1 / -1; grid-row: 3; text-align: left; }
+}
+
+.quotations-compact th:nth-child(1), .quotations-compact td:nth-child(1) { width: 120px; }
+.orders-compact th, .orders-compact td { box-sizing: border-box; }

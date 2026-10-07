@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { apiFetch, jsonBody } from './api';
 
 interface Expense {
@@ -55,6 +55,15 @@ const emptyForm = (): FormState => ({
 });
 
 export default function ExpenseTracker() {
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const toggleExpanded = (id: number) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -299,42 +308,64 @@ export default function ExpenseTracker() {
               <p className="empty-state">No expenses recorded yet.</p>
             ) : (
               <div className="orders-table-wrap">
-              <table className="items-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Name</th>
-                    <th>Cost</th>
-                    <th>Unit</th>
-                    <th>Payment</th>
-                    <th>Details</th>
-                    <th></th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expenses.map((exp) => (
-                    <tr key={exp.id}>
-                      <td>{exp.expense_date}</td>
-                      <td>{exp.name}</td>
-                      <td className="items-price-cell">{fmt(exp.cost)} {exp.currency}</td>
-                      <td>{exp.unit || '—'}</td>
-                      <td>
-                        <span className={`status-pill ${exp.recurrence !== 'one_time' ? 'status-in_progress' : ''}`}>
-                          {RECURRENCE_LABELS[exp.recurrence]}
-                        </span>
-                      </td>
-                      <td className="expense-details-cell" title={exp.details ?? ''}>{exp.details || '—'}</td>
-                      <td>
-                        <button className="order-edit-btn" onClick={() => startEdit(exp)}>Edit</button>
-                      </td>
-                      <td>
-                        <button className="item-remove" onClick={() => handleDelete(exp)} aria-label="Delete expense">×</button>
-                      </td>
+                <table className="items-table orders-compact expenses-compact">
+                  <thead>
+                    <tr>
+                      <th>Expense</th>
+                      <th>Payment</th>
+                      <th className="num-col">Cost</th>
+                      <th></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {expenses.map((exp) => {
+                      const isOpen = expanded.has(exp.id);
+                      return (
+                        <Fragment key={exp.id}>
+                          <tr className={isOpen ? 'is-open' : ''}>
+                            <td>
+                              <span className="cell-main">{exp.name}</span>
+                              <span className="cell-sub">{exp.expense_date}</span>
+                            </td>
+                            <td>
+                              <span className={`status-pill ${exp.recurrence !== 'one_time' ? 'status-in_progress' : ''}`}>
+                                {RECURRENCE_LABELS[exp.recurrence]}
+                              </span>
+                            </td>
+                            <td className="items-price-cell num-col">{fmt(exp.cost)} {exp.currency}</td>
+                            <td className="row-action-cell">
+                              <button
+                                className={`details-btn ${isOpen ? 'is-open' : ''}`}
+                                onClick={() => toggleExpanded(exp.id)}
+                                aria-expanded={isOpen}
+                              >
+                                Details
+                                <span className="details-caret" aria-hidden="true">▾</span>
+                              </button>
+                            </td>
+                          </tr>
+                          {isOpen && (
+                            <tr className="detail-row">
+                              <td colSpan={4}>
+                                <div className="order-detail">
+                                  <dl className="detail-grid">
+                                    <div><dt>Date</dt><dd>{exp.expense_date}</dd></div>
+                                    <div><dt>Unit</dt><dd>{exp.unit || '—'}</dd></div>
+                                    <div className="detail-wide"><dt>Details</dt><dd>{exp.details || '—'}</dd></div>
+                                  </dl>
+                                  <div className="detail-actions">
+                                    <button className="save-btn" onClick={() => startEdit(exp)}>Edit expense</button>
+                                    <button className="order-edit-btn danger-link" onClick={() => handleDelete(exp)}>Delete</button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

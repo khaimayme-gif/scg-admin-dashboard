@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { apiFetch, jsonBody } from './api';
 import { renderQuotationPng, downloadBlob } from './quotationImage';
 import type { QuotationForOrder } from './Orders';
@@ -66,6 +66,16 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const toggleExpanded = (id: number) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   // The newest saved quotation, shown as a card. history is sorted newest-first by the server.
   const lastQuotation = history[0] ?? null;
@@ -179,17 +189,6 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
       setDownloadingId(null);
     }
   };
-
-  const makeOrderButton = (q: Quotation) =>
-    onMakeOrder && (
-      <button
-        className={`make-order-btn ${q.order_id ? 'is-ordered' : ''}`}
-        onClick={() => onMakeOrder(q)}
-        title={q.order_id ? `Already order ${q.order_no}. Click to open it.` : 'Customer paid: turn this quotation into an order'}
-      >
-        {q.order_id ? `Order ${q.order_no ?? ''} ✓` : 'Make Order'}
-      </button>
-    );
 
   const amountLine = (mmk: number | null, jpy: number | null) =>
     mmk === null || jpy === null ? 'Set exchange rates in Settings' : `${fmt(mmk)} MMK and ${fmt(jpy)} Yen`;
@@ -374,52 +373,92 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
           <p className="empty-state">No quotations yet.</p>
         ) : (
           <div className="orders-table-wrap">
-            <table className="items-table">
+            <table className="items-table orders-compact quotations-compact">
               <thead>
                 <tr>
-                  <th>Quotation ID</th>
-                  <th>Date</th>
+                  <th>Quotation</th>
                   <th>Customer</th>
-                  <th>Place</th>
-                  <th>Channel</th>
-                  <th>Items</th>
-                  <th>Total</th>
-                  <th>MMK</th>
-                  <th>Yen</th>
-                  <th>Revenue</th>
+                  <th>Status</th>
+                  <th className="num-col">Total</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {history.map((q) => (
-                  <tr key={q.id}>
-                    <td>{q.quote_no}</td>
-                    <td>{q.quote_date}</td>
-                    <td>{q.customer_name}</td>
-                    <td>{q.order_place}</td>
-                    <td>{CHANNELS[q.channel] ?? q.channel}</td>
-                    <td>{q.items.map((i) => i.name).join(', ')}</td>
-                    <td className="items-price-cell">{fmt(q.total_thb)} THB</td>
-                    <td className="items-price-cell">{q.total_mmk === null ? '—' : fmt(q.total_mmk)}</td>
-                    <td className="items-price-cell">{q.total_jpy === null ? '—' : fmt(q.total_jpy)}</td>
-                    <td className={`items-price-cell ${q.revenue_thb < 0 ? 'profit-negative' : ''}`}>
-                      {fmt(q.revenue_thb)} THB
-                    </td>
-                    <td className="quote-row-actions">
-                      {makeOrderButton(q)}
-                      <button
-                        className="item-remove"
-                        onClick={() => handleDownload(q)}
-                        disabled={downloadingId === q.id}
-                        aria-label="Download quotation"
-                        title="Download quotation"
-                      >
-                        {downloadingId === q.id ? '…' : '⬇'}
-                      </button>
-                      <button className="item-remove" onClick={() => handleDelete(q)} aria-label="Delete quotation">×</button>
-                    </td>
-                  </tr>
-                ))}
+                {history.map((q) => {
+                  const isOpen = expanded.has(q.id);
+                  return (
+                    <Fragment key={q.id}>
+                      <tr className={isOpen ? 'is-open' : ''}>
+                        <td>
+                          <span className="cell-main">{q.quote_no}</span>
+                          <span className="cell-sub">{q.quote_date}</span>
+                        </td>
+                        <td>
+                          <span className="cell-main">{q.customer_name}</span>
+                          <span className="cell-sub">{q.items.map((i) => i.name).join(', ')}</span>
+                        </td>
+                        <td>
+                          <span className={`status-pill ${q.order_id ? 'status-paid' : ''}`}>
+                            {q.order_id ? 'Ordered' : 'Quoted'}
+                          </span>
+                        </td>
+                        <td className="items-price-cell num-col">{fmt(q.total_thb)} THB</td>
+                        <td className="row-action-cell">
+                          <button
+                            className={`details-btn ${isOpen ? 'is-open' : ''}`}
+                            onClick={() => toggleExpanded(q.id)}
+                            aria-expanded={isOpen}
+                          >
+                            Details
+                            <span className="details-caret" aria-hidden="true">▾</span>
+                          </button>
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr className="detail-row">
+                          <td colSpan={5}>
+                            <div className="order-detail">
+                              <dl className="detail-grid">
+                                <div><dt>Order place</dt><dd>{q.order_place}</dd></div>
+                                <div><dt>Channel</dt><dd>{CHANNELS[q.channel] ?? q.channel}</dd></div>
+                                <div><dt>In MMK</dt><dd className="items-price-cell">{q.total_mmk === null ? '—' : `${fmt(q.total_mmk)} MMK`}</dd></div>
+                                <div><dt>In Yen</dt><dd className="items-price-cell">{q.total_jpy === null ? '—' : `${fmt(q.total_jpy)} Yen`}</dd></div>
+                                <div><dt>Original cost</dt><dd className="items-price-cell">{fmt(q.original_thb)} THB</dd></div>
+                                <div>
+                                  <dt>Revenue</dt>
+                                  <dd className={`items-price-cell ${q.revenue_thb < 0 ? 'profit-negative' : ''}`}>{fmt(q.revenue_thb)} THB</dd>
+                                </div>
+                              </dl>
+                              <div className="detail-items">
+                                <span className="detail-label">Items</span>
+                                <ul>
+                                  {q.items.map((it, i) => (
+                                    <li key={i}><span>{it.name}: {fmt(it.sellingPrice)} THB</span></li>
+                                  ))}
+                                </ul>
+                              </div>
+                              <div className="detail-actions">
+                                {onMakeOrder && (
+                                  <button className="save-btn" onClick={() => onMakeOrder(q)}>
+                                    {q.order_id ? `Open order ${q.order_no ?? ''}` : 'Make Order'}
+                                  </button>
+                                )}
+                                <button
+                                  className="add-item-btn"
+                                  onClick={() => handleDownload(q)}
+                                  disabled={downloadingId === q.id}
+                                >
+                                  {downloadingId === q.id ? 'Preparing…' : 'Download'}
+                                </button>
+                                <button className="order-edit-btn danger-link" onClick={() => handleDelete(q)}>Delete</button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
