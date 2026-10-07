@@ -1,4 +1,4 @@
-const { requireAuth } = require('../auth');
+const { requireSuper } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 
 const CODE_PATTERN = /^[A-Z0-9]{1,4}$/;
@@ -16,7 +16,7 @@ function nextCode(prefix, itemCodes) {
 }
 
 module.exports = async (req, res, [first, second]) => {
-  if (!requireAuth(req, res)) return;
+  if (!requireSuper(req, res)) return;
   await ensureSchema();
 
   if (!first && req.method === 'GET') {

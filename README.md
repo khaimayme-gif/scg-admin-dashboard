@@ -221,3 +221,14 @@ Items registered in the admin (Items page) are published through two public, rea
 - `GET /api/public/photo/:id` returns the item's image (the `photo_url` above points here).
 
 CORS is open (`*`) and responses are cached for 60 seconds.
+
+## Roles (RBAC)
+
+Two roles, each with its own password (environment variables in Vercel; redeploy after changing them):
+
+| Role | Password variable | Access |
+|---|---|---|
+| Super admin | `ADMIN_PASSWORD` | Everything |
+| Japan admin | `JAPAN_ADMIN_PASSWORD` | So Chic Board, Orders, Quotation, QR Code Generator, limited to **Japan** records (orders/quotations/tickets whose country or order place is Japan) and the QR codes she created. No Dashboard, Items, Expenses or Settings; cannot read or save the item catalog, expenses or settings (reading exchange rates is allowed so quotations can convert). |
+
+The role is stored in the signed session cookie and enforced in the API (`lib/auth.js`, `lib/routes/*`), not just hidden in the menu. Japan admin writes are forced to Japan, and records outside Japan return 404 for her.

@@ -4,6 +4,8 @@ const { pool, ensureSchema } = require('../db');
 // Payment status. 'cancelled' only survives on orders cancelled before the board existed.
 const STATUSES = ['pending', 'partially_paid', 'paid', 'cancelled'];
 const CURRENCIES = ['THB', 'JPY', 'MMK'];
+// SQL condition for "this is a Japan order", used to fence in the Japan admin.
+const JAPAN_ONLY = "lower(btrim(country)) = 'japan'";
 const CHANNELS = ['tiktok', 'facebook'];
 
 const ORDER_COLUMNS = `id, order_no, quotation_id, customer_name, country, channel,
@@ -44,12 +46,14 @@ function toThb(amount, currency, rates) {
 }
 
 module.exports = async (req, res, [first, second]) => {
-  if (!requireAuth(req, res)) return;
+  const session = requireAuth(req, res);
+  if (!session) return;
+  const japan = session.role === 'japan';
   await ensureSchema();
 
   if (!first && req.method === 'GET') {
     const result = await pool.query(
-      `SELECT ${ORDER_COLUMNS} FROM orders ORDER BY order_date DESC, id DESC`
+      `SELECT ${ORDER_COLUMNS} FROM orders ${japan ? `WHERE ${JAPAN_ONLY}` : ''} ORDER BY order_date DESC, id DESC`
     );
     return res.status(200).json(result.rows.map(parse));
   }
@@ -59,7 +63,7 @@ module.exports = async (req, res, [first, second]) => {
       pool.query(
         `SELECT status, currency, selling_price, cost, revenue,
                 to_char(order_date, 'YYYY-MM') AS month
-         FROM orders`
+         FROM orders ${japan ? `WHERE ${JAPAN_ONLY}` : ''}`
       ),
       pool.query('SELECT * FROM settings WHERE id = 1'),
     ]);
@@ -125,7 +129,9 @@ module.exports = async (req, res, [first, second]) => {
       id, customerName, country, channel, orderDate, status, currency, sellingPrice, items, notes,
       recipient, recipientPhone, deliveryDate, deliveryAddress, deliveryNote, quotationId,
     } = req.body || {};
-    if (!customerName || !country) {
+    // The Japan admin can only work with Japan orders: the country is fixed, whatever was sent.
+    const orderCountry = japan ? 'Japan' : country;
+    if (!customerName || !orderCountry) {
       return res.status(400).json({ error: 'customerName and country are required' });
     }
     if (!CHANNELS.includes(channel)) return res.status(400).json({ error: 'Invalid channel' });
@@ -155,7 +161,7 @@ module.exports = async (req, res, [first, second]) => {
 
     const values = [
       customerName.trim(),
-      country.trim(),
+      orderCountry.trim(),
       channel,
       orderDate || new Date().toISOString().slice(0, 10),
       status,
@@ -179,9 +185,9 @@ module.exports = async (req, res, [first, second]) => {
            currency = $6, selling_price = $7, cost = $8, revenue = $9, items_json = $10, notes = $11,
            recipient = $12, recipient_phone = $13, delivery_date = $14, delivery_address = $15, delivery_note = $16,
            updated_at = NOW()
-         WHERE id = $17
+         WHERE id = $17 AND ($18::boolean = false OR ${JAPAN_ONLY})
          RETURNING ${ORDER_COLUMNS}`,
-        [...values, id]
+        [...values, id, japan]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
       return res.status(200).json(parse(result.rows[0]));
@@ -193,6 +199,13 @@ module.exports = async (req, res, [first, second]) => {
       if (!Number.isInteger(linkedQuotation)) {
         return res.status(400).json({ error: 'quotationId must be a number' });
       }
+    }
+
+    if (japan && linkedQuotation !== null) {
+      const q = await pool.query(
+        `SELECT 1 FROM quotations WHERE id = $1 AND lower(btrim(order_place)) = 'japan'`, [linkedQuotation]
+      );
+      if (q.rowCount === 0) return res.status(404).json({ error: 'Quotation not found' });
     }
 
     const client = await pool.connect();
@@ -234,7 +247,10 @@ module.exports = async (req, res, [first, second]) => {
 
   if (first === 'delete' && second && req.method === 'DELETE') {
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
-    await pool.query('DELETE FROM orders WHERE id = $1', [second]);
+    const result = await pool.query(
+      `DELETE FROM orders WHERE id = $1 AND ($2::boolean = false OR ${JAPAN_ONLY})`, [second, japan]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
     return res.status(200).json({ deleted: true });
   }
 

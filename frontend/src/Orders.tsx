@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { apiFetch, jsonBody } from './api';
 import { renderOrderPng } from './orderImage';
 import { downloadBlob } from './quotationImage';
+import { useRole } from './role';
 
 interface OrderItem {
   name: string;
@@ -273,6 +274,8 @@ interface OrdersProps {
 }
 
 export default function Orders({ intent = null, onIntentHandled }: OrdersProps) {
+  // The Japan admin only works with Japan orders; the server enforces it too.
+  const isJapan = useRole() === 'japan';
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
@@ -313,8 +316,8 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
   useEffect(() => {
     loadAll();
     apiFetch('/items')
-      .then((res) => res.json())
-      .then(setCatalog)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setCatalog(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
@@ -428,7 +431,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
   // Saves the order. With andDownload, also produces the confirmation image from what the
   // server saved, so the image always matches the stored order and carries its order number.
   const handleSubmit = async (andDownload = false) => {
-    if (!form.customerName.trim() || !form.country.trim()) {
+    if (!form.customerName.trim() || !(isJapan ? 'Japan' : form.country).trim()) {
       setFormError('Customer name and country are required.');
       return;
     }
@@ -440,7 +443,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
         id: form.id ?? undefined,
         quotationId: form.id ? undefined : form.quotationId ?? undefined,
         customerName: form.customerName,
-        country: form.country,
+        country: isJapan ? 'Japan' : form.country,
         channel: form.channel,
         orderDate: form.orderDate,
         status: form.status,
@@ -595,11 +598,12 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                   className="item-input"
                   list="order-countries"
                   placeholder="e.g. Japan"
-                  value={form.country}
+                  value={isJapan ? 'Japan' : form.country}
+                  disabled={isJapan}
                   onChange={(e) => update('country', e.target.value)}
                 />
                 <datalist id="order-countries">
-                  {COMMON_COUNTRIES.map((c) => (
+                  {(isJapan ? ['Japan'] : COMMON_COUNTRIES).map((c) => (
                     <option key={c} value={c} />
                   ))}
                 </datalist>

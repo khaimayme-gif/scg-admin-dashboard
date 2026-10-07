@@ -5,8 +5,19 @@ const { pool, ensureSchema } = require('../db');
 const STAGES = ['todo', 'in_progress', 'done', 'closed'];
 
 module.exports = async (req, res, [first, second]) => {
-  if (!requireAuth(req, res)) return;
+  const session = requireAuth(req, res);
+  if (!session) return;
+  const japan = session.role === 'japan';
   await ensureSchema();
+
+  // The Japan admin only sees and touches Japan tickets.
+  const canTouch = async (orderId) => {
+    const r = await pool.query(
+      `SELECT 1 FROM orders WHERE id = $1 AND ($2::boolean = false OR lower(btrim(country)) = 'japan')`,
+      [orderId, japan]
+    );
+    return r.rowCount > 0;
+  };
 
   // All tickets, lightweight: no comments, just how many there are.
   if (!first && req.method === 'GET') {
@@ -18,6 +29,7 @@ module.exports = async (req, res, [first, second]) => {
               o.board_stage, o.board_position,
               (SELECT COUNT(*)::int FROM board_comments c WHERE c.order_id = o.id) AS comment_count
        FROM orders o
+       ${japan ? "WHERE lower(btrim(o.country)) = 'japan'" : ''}
        ORDER BY o.board_position`
     );
     return res.status(200).json(
@@ -31,8 +43,9 @@ module.exports = async (req, res, [first, second]) => {
     if (!Number.isInteger(orderId)) return res.status(400).json({ error: 'orderId must be a number' });
     const pos = Number.isFinite(Number(position)) ? Number(position) : Date.now();
     const result = await pool.query(
-      'UPDATE orders SET board_stage = $1, board_position = $2, updated_at = NOW() WHERE id = $3 RETURNING id',
-      [stage, pos, orderId]
+      `UPDATE orders SET board_stage = $1, board_position = $2, updated_at = NOW()
+       WHERE id = $3 AND ($4::boolean = false OR lower(btrim(country)) = 'japan') RETURNING id`,
+      [stage, pos, orderId, japan]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
     return res.status(200).json({ id: orderId, stage, position: pos });
@@ -40,6 +53,7 @@ module.exports = async (req, res, [first, second]) => {
 
   if (first === 'comments' && second && req.method === 'GET') {
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
+    if (!(await canTouch(second))) return res.status(404).json({ error: 'Order not found' });
     const result = await pool.query(
       'SELECT id, body, created_at FROM board_comments WHERE order_id = $1 ORDER BY created_at, id',
       [second]
@@ -53,8 +67,7 @@ module.exports = async (req, res, [first, second]) => {
     if (!Number.isInteger(orderId)) return res.status(400).json({ error: 'orderId must be a number' });
     if (!body) return res.status(400).json({ error: 'Write something first' });
     if (body.length > 2000) return res.status(400).json({ error: 'Comment is too long (2000 characters max)' });
-    const order = await pool.query('SELECT 1 FROM orders WHERE id = $1', [orderId]);
-    if (order.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
+    if (!(await canTouch(orderId))) return res.status(404).json({ error: 'Order not found' });
     const result = await pool.query(
       'INSERT INTO board_comments (order_id, body) VALUES ($1, $2) RETURNING id, body, created_at',
       [orderId, body]
@@ -64,7 +77,11 @@ module.exports = async (req, res, [first, second]) => {
 
   if (first === 'comment' && second && req.method === 'DELETE') {
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
-    await pool.query('DELETE FROM board_comments WHERE id = $1', [second]);
+    await pool.query(
+      `DELETE FROM board_comments c USING orders o
+       WHERE c.id = $1 AND o.id = c.order_id AND ($2::boolean = false OR lower(btrim(o.country)) = 'japan')`,
+      [second, japan]
+    );
     return res.status(200).json({ deleted: true });
   }
 

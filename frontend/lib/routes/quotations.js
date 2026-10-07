@@ -26,7 +26,9 @@ const nextQuoteNo = async (client) => {
 };
 
 module.exports = async (req, res, [first, second]) => {
-  if (!requireAuth(req, res)) return;
+  const session = requireAuth(req, res);
+  if (!session) return;
+  const japan = session.role === 'japan';
   await ensureSchema();
 
   if (!first && req.method === 'GET') {
@@ -36,13 +38,16 @@ module.exports = async (req, res, [first, second]) => {
               o.id AS order_id, o.order_no
        FROM quotations q
        LEFT JOIN orders o ON o.quotation_id = q.id
+       ${japan ? "WHERE lower(btrim(q.order_place)) = 'japan'" : ''}
        ORDER BY q.created_at DESC, q.id DESC`
     );
     return res.status(200).json(result.rows.map(parse));
   }
 
   if (first === 'save' && req.method === 'POST') {
-    const { customerName, channel, quoteDate, orderPlace, items } = req.body || {};
+    const { customerName, channel, quoteDate, items } = req.body || {};
+    // The Japan admin can only quote for Japan, whatever was sent.
+    const orderPlace = japan ? 'Japan' : (req.body || {}).orderPlace;
     if (!customerName || !customerName.trim()) {
       return res.status(400).json({ error: 'customerName is required' });
     }
@@ -111,7 +116,11 @@ module.exports = async (req, res, [first, second]) => {
 
   if (first === 'delete' && second && req.method === 'DELETE') {
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
-    await pool.query('DELETE FROM quotations WHERE id = $1', [second]);
+    const result = await pool.query(
+      `DELETE FROM quotations WHERE id = $1 AND ($2::boolean = false OR lower(btrim(order_place)) = 'japan')`,
+      [second, japan]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Quotation not found' });
     return res.status(200).json({ deleted: true });
   }
 

@@ -16,14 +16,15 @@ module.exports = async (req, res, [action]) => {
       }
 
       const { password } = req.body || {};
-      if (!verifyPassword(password)) {
+      const role = verifyPassword(password);
+      if (!role) {
         await recordFailure(ip);
         return res.status(401).json({ error: 'Incorrect password' });
       }
 
       await clearFailures(ip);
-      res.setHeader('Set-Cookie', createSessionCookie());
-      return res.status(200).json({ ok: true });
+      res.setHeader('Set-Cookie', createSessionCookie(role));
+      return res.status(200).json({ ok: true, role });
     } catch (err) {
       console.error('Sign-in failed', err);
       return res.status(500).json({ error: 'Sign-in is temporarily unavailable' });
@@ -37,8 +38,8 @@ module.exports = async (req, res, [action]) => {
   }
 
   if (action === 'check') {
-    const cookies = parseCookies(req);
-    return res.status(200).json({ authenticated: verifySignedToken(cookies.scg_session) });
+    const session = verifySignedToken(parseCookies(req).scg_session);
+    return res.status(200).json({ authenticated: Boolean(session), role: session ? session.role : null });
   }
 
   return res.status(404).json({ error: 'Not found' });

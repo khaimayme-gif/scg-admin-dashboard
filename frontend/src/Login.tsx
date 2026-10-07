@@ -1,10 +1,11 @@
 import { useState } from 'react';
+import type { Role } from './role';
 import logo from './assets/sochic-logo-pink.png';
 
 const API_BASE = '/api';
 
 interface LoginProps {
-  onSuccess: () => void;
+  onSuccess: (role: Role) => void;
 }
 
 export default function Login({ onSuccess }: LoginProps) {
@@ -37,7 +38,8 @@ export default function Login({ onSuccess }: LoginProps) {
         setStatus('idle');
         return;
       }
-      onSuccess();
+      const data = await res.json().catch(() => ({}));
+      onSuccess(data.role === 'japan' ? 'japan' : 'superadmin');
     } catch {
       setErrorMsg('Could not reach the server. Check your connection and try again.');
       setStatus('idle');

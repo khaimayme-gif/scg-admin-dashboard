@@ -1,4 +1,6 @@
 import logo from './assets/sochic-logo-pink.png';
+import { ROLE_PAGES, ROLE_LABELS } from './role';
+import type { Role } from './role';
 
 interface SidebarProps {
   active: string;
@@ -6,6 +8,7 @@ interface SidebarProps {
   onLogout: () => void;
   open: boolean;
   onClose: () => void;
+  role: Role;
 }
 
 const MODULES = [
@@ -20,7 +23,7 @@ const MODULES = [
   { id: 'settings', label: 'Settings', ready: true },
 ];
 
-export default function Sidebar({ active, onSelect, onLogout, open, onClose }: SidebarProps) {
+export default function Sidebar({ active, onSelect, onLogout, open, onClose, role }: SidebarProps) {
   return (
     <>
     <div className={`sidebar-backdrop ${open ? 'is-open' : ''}`} onClick={onClose} aria-hidden="true" />
@@ -28,10 +31,10 @@ export default function Sidebar({ active, onSelect, onLogout, open, onClose }: S
       <div className="sidebar-brand">
         <img className="sidebar-logo" src={logo} alt="So Chic Gifts" />
         <span className="sidebar-brand-mark">So Chic Gifts</span>
-        <span className="sidebar-brand-sub">Admin</span>
+        <span className="sidebar-brand-sub">{role === 'superadmin' ? 'Admin' : ROLE_LABELS[role]}</span>
       </div>
       <ul className="sidebar-list">
-        {MODULES.map((mod) => (
+        {MODULES.filter((mod) => ROLE_PAGES[role].includes(mod.id)).map((mod) => (
           <li key={mod.id}>
             <button
               className={`sidebar-item ${active === mod.id ? 'is-active' : ''} ${!mod.ready ? 'is-disabled' : ''}`}
