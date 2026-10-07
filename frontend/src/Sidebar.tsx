@@ -9,6 +9,7 @@ interface SidebarProps {
 }
 
 const MODULES = [
+  { id: 'dashboard', label: 'Dashboard', ready: true },
   { id: 'quotation', label: 'Quotation', ready: true },
   { id: 'items', label: 'Items', ready: true },
   { id: 'qr', label: 'QR Code Generator', ready: true },
