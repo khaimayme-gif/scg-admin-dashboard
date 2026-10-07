@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiFetch, jsonBody } from './api';
+import { useRole } from './role';
 import { readItemsWorkbook } from './itemImport';
 import type { ImportRow } from './itemImport';
 
@@ -45,6 +46,14 @@ const emptyForm = (): FormState => ({
   itemCode: '', category: '', name: '', description: '', itemGroup: '', menuPrice: '', originalCost: '',
   published: true, photo: undefined, existingPhotoUrl: null,
 });
+
+type Country = 'thailand' | 'japan';
+
+// Thailand's catalog is in baht and Japan's in yen.
+const CURRENCY: Record<Country, { code: string; sign: string; label: string }> = {
+  thailand: { code: 'THB', sign: '฿', label: 'Thailand' },
+  japan: { code: 'JPY', sign: '¥', label: 'Japan' },
+};
 
 const photoUrl = (item: Item) => `/api/items/photo/${item.id}?v=${item.photo_version}`;
 const fmt = (n: number) => Math.round(n).toLocaleString();
@@ -183,7 +192,8 @@ function TypesModal({ types, onClose, onChanged }: { types: ItemType[]; onClose:
   );
 }
 
-function ImportModal({ types, itemCount, onClose, onDone }: {
+function ImportModal({ country, types, itemCount, onClose, onDone }: {
+  country: Country;
   types: ItemType[];
   itemCount: number;
   onClose: () => void;
@@ -246,6 +256,7 @@ function ImportModal({ types, itemCount, onClose, onDone }: {
           type: r.type, group: r.group, name: r.name, detail: r.detail,
           price: r.price, cost: r.cost, photoName: r.photoName, show: r.show,
         })),
+        country,
       }));
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -266,7 +277,7 @@ function ImportModal({ types, itemCount, onClose, onDone }: {
     <div className="modal-backdrop">
       <div className="modal-card types-card">
         <div className="modal-header">
-          <h2 className="panel-label">Import items from Excel</h2>
+          <h2 className="panel-label">Import {CURRENCY[country].label} items from Excel</h2>
           <button className="item-remove" onClick={onClose} aria-label="Close">×</button>
         </div>
 
@@ -282,7 +293,7 @@ function ImportModal({ types, itemCount, onClose, onDone }: {
           <>
             <p className="stat-sub">
               Choose the filled-in import template (.xlsx). You will see what will be created before anything is saved.
-              Item IDs are given automatically, per type, in row order.
+              Item IDs are given automatically, per type, in row order. Prices are in {CURRENCY[country].code}.
             </p>
             <input ref={fileRef} type="file" accept=".xlsx" hidden onChange={(e) => onFile(e.target.files?.[0])} />
             <button className="add-item-btn" onClick={() => fileRef.current?.click()}>{fileName ? 'Choose another file' : 'Choose Excel file'}</button>
@@ -346,7 +357,9 @@ function ImportModal({ types, itemCount, onClose, onDone }: {
   );
 }
 
-export default function Items() {
+export default function Items({ country }: { country: Country }) {
+  const isJapanRole = useRole() === 'japan';
+  const money = CURRENCY[country];
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [types, setTypes] = useState<ItemType[]>([]);
@@ -358,14 +371,14 @@ export default function Items() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadItems = () =>
-    apiFetch('/items')
+    apiFetch(`/items?country=${country}`)
       .then((res) => res.json())
       .then((data) => setItems(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setLoading(false));
 
   const loadTypes = () =>
-    apiFetch('/item-types')
+    apiFetch(`/item-types?country=${country}`)
       .then((res) => res.json())
       .then((data) => setTypes(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -430,6 +443,7 @@ export default function Items() {
     try {
       const res = await apiFetch('/items/save', jsonBody({
         id: form.id,
+        country,
         itemCode: form.itemCode,
         category: form.category.trim(),
         name: form.name.trim(),
@@ -487,14 +501,14 @@ export default function Items() {
     <div className="page">
       <header className="page-header page-header-row">
         <div>
-          <h1>Items</h1>
+          <h1>{money.label} Items</h1>
           <p className="page-subtitle">
-            Your catalog. Published items show up on the So Chic Gifts website menu, with the photo, name and selling price.
+            The {money.label} catalog, in {money.code}. Published items show up on the So Chic Gifts website menu, with the photo, name and selling price.
           </p>
         </div>
         <div className="header-actions">
           <button className="header-secondary-btn" onClick={() => setShowImport(true)}>Import</button>
-          <button className="header-secondary-btn" onClick={() => setShowTypes(true)}>Item Types</button>
+          {!isJapanRole && <button className="header-secondary-btn" onClick={() => setShowTypes(true)}>Item Types</button>}
           <button className="new-order-btn" onClick={openNew}>New Item</button>
         </div>
       </header>
@@ -529,11 +543,11 @@ export default function Items() {
                       <span className="item-card-code">{item.item_code ?? 'No ID'}{item.item_group ? ` · ${item.item_group}` : ''}</span>
                       <span className="item-card-name">{item.name}</span>
                       <span className="item-card-desc">{item.description ?? ''}</span>
-                      <span className="item-card-price">฿{fmt(item.menu_price)}</span>
+                      <span className="item-card-price">{money.sign}{fmt(item.menu_price)}</span>
                       <span className={`item-card-cost ${itemProfit !== null && itemProfit < 0 ? 'profit-negative' : ''}`}>
                         {item.original_cost === null
                           ? 'Cost not set'
-                          : `Cost ฿${fmt(item.original_cost)} · Profit ฿${fmt(itemProfit ?? 0)}`}
+                          : `Cost ${money.sign}${fmt(item.original_cost)} · Profit ${money.sign}${fmt(itemProfit ?? 0)}`}
                       </span>
                     </button>
                   );
@@ -546,6 +560,7 @@ export default function Items() {
 
       {showImport && (
         <ImportModal
+          country={country}
           types={types}
           itemCount={items.length}
           onClose={() => setShowImport(false)}
@@ -630,12 +645,12 @@ export default function Items() {
                   onChange={(e) => update('description', e.target.value)} />
               </div>
               <div className="order-field">
-                <label>Selling price (THB)</label>
+                <label>Selling price ({money.code})</label>
                 <input type="number" min="0" className="item-input" placeholder="0" value={form.menuPrice}
                   onChange={(e) => update('menuPrice', e.target.value)} />
               </div>
               <div className="order-field">
-                <label>Cost (THB, only you see this)</label>
+                <label>Cost ({money.code}, only you see this)</label>
                 <input type="number" min="0" className="item-input" placeholder="0" value={form.originalCost}
                   onChange={(e) => update('originalCost', e.target.value)} />
               </div>
@@ -644,7 +659,7 @@ export default function Items() {
 
             {profit !== null && (
               <p className={`order-profit ${profit < 0 ? 'profit-negative' : ''}`}>
-                Profit {fmt(profit)} THB{price > 0 ? ` (${Math.round((profit / price) * 100)}%)` : ''}
+                Profit {fmt(profit)} {money.code}{price > 0 ? ` (${Math.round((profit / price) * 100)}%)` : ''}
               </p>
             )}
 

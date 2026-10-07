@@ -1,4 +1,4 @@
-const { requireSuper } = require('../auth');
+const { requireAuth } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 
 const CODE_PATTERN = /^[A-Z0-9]{1,4}$/;
@@ -16,14 +16,24 @@ function nextCode(prefix, itemCodes) {
 }
 
 module.exports = async (req, res, [first, second]) => {
-  if (!requireSuper(req, res)) return;
+  const session = requireAuth(req, res);
+  if (!session) return;
   await ensureSchema();
 
+  // Everyone can read the types (the Japan admin needs them to add items); only the super admin
+  // can change them.
+  if ((first === 'save' || first === 'delete') && session.role !== 'superadmin') {
+    return res.status(403).json({ error: 'You do not have access to this' });
+  }
+
   if (!first && req.method === 'GET') {
+    // Item IDs and counts are per country catalog.
+    const requested = new URL(req.url, 'http://localhost').searchParams.get('country');
+    const country = session.role === 'japan' ? 'japan' : requested === 'japan' ? 'japan' : 'thailand';
     const [types, codes, counts] = await Promise.all([
       pool.query('SELECT id, name, code FROM item_types ORDER BY id'),
-      pool.query('SELECT item_code FROM items WHERE item_code IS NOT NULL'),
-      pool.query('SELECT category, COUNT(*)::int AS n FROM items GROUP BY category'),
+      pool.query('SELECT item_code FROM items WHERE item_code IS NOT NULL AND country = $1', [country]),
+      pool.query('SELECT category, COUNT(*)::int AS n FROM items WHERE country = $1 GROUP BY category', [country]),
     ]);
     const itemCodes = codes.rows.map((r) => r.item_code);
     const countByName = new Map(counts.rows.map((r) => [r.category, r.n]));

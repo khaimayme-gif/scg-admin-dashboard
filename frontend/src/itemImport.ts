@@ -21,8 +21,8 @@ const COLUMNS: Record<string, string> = {
   group: 'group',
   name: 'itemname',
   detail: 'detail',
-  price: 'sellingpricethb',
-  cost: 'costthb',
+  price: 'sellingprice',
+  cost: 'cost',
   photoName: 'photofilename',
   show: 'showonwebsite',
 };
@@ -42,7 +42,8 @@ export async function readItemsWorkbook(file: File): Promise<ImportRow[]> {
   const header = sheet.data[0] ?? [];
   const index: Record<string, number> = {};
   for (const [key, wanted] of Object.entries(COLUMNS)) {
-    index[key] = header.findIndex((h) => norm(h) === wanted);
+    // "Selling Price THB *" and "Selling Price JPY" both count: the catalog decides the currency.
+    index[key] = header.findIndex((h) => (key === 'price' || key === 'cost' ? norm(h).startsWith(wanted) : norm(h) === wanted));
   }
   if (index.type < 0 || index.name < 0 || index.price < 0) {
     throw new Error('The Items sheet needs the columns Item Type, Item Name and Selling Price THB.');

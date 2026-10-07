@@ -76,6 +76,7 @@ interface Stats extends Totals {
 
 interface CatalogItem {
   id: number;
+  country: 'thailand' | 'japan';
   name: string;
   menu_price: number;
   original_cost: number | null;
@@ -340,9 +341,13 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
       .then((res) => res.json())
       .then((s) => setRates(s.rateThbToJpy && s.rateThbToMmk ? { thbToJpy: s.rateThbToJpy, thbToMmk: s.rateThbToMmk } : null))
       .catch(() => {});
-    apiFetch('/items')
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setCatalog(Array.isArray(data) ? data : []))
+    // Each country has its own catalog; the order form suggests the one that matches the order.
+    Promise.all((['thailand', 'japan'] as const).map((c) =>
+      apiFetch(`/items?country=${c}`)
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => (Array.isArray(data) ? data.map((i: CatalogItem) => ({ ...i, country: c })) : []))
+    ))
+      .then((lists) => setCatalog(lists.flat()))
       .catch(() => {});
   }, []);
 
@@ -736,7 +741,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
               are the lines under each item, one per line (design, text on cake, size, colour, message…).
             </p>
             <datalist id="order-catalog-items">
-              {catalog.map((c) => (
+              {catalog.filter((c) => c.country === ((isJapan ? 'Japan' : form.country).trim().toLowerCase() === 'japan' ? 'japan' : 'thailand')).map((c) => (
                 <option key={c.id} value={c.name} />
               ))}
             </datalist>

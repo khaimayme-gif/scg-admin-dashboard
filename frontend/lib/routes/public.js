@@ -17,10 +17,13 @@ module.exports = async (req, res, [first, second]) => {
 
   if (first === 'menu') {
     await ensureSchema();
+    // ?country=japan for the Japan menu; Thailand is the default.
+    const country = new URL(req.url, 'http://localhost').searchParams.get('country') === 'japan' ? 'japan' : 'thailand';
     const result = await pool.query(
       `SELECT id, category, item_code, name, description, item_group, menu_price,
          (photo_data IS NOT NULL) AS has_photo, EXTRACT(EPOCH FROM updated_at)::bigint AS v
-       FROM items WHERE published ORDER BY category, item_code NULLS LAST, name`
+       FROM items WHERE published AND country = $1 ORDER BY category, item_code NULLS LAST, name`,
+      [country]
     );
     const proto = req.headers['x-forwarded-proto'] || 'https';
     const origin = `${proto}://${req.headers.host}`;
@@ -38,6 +41,8 @@ module.exports = async (req, res, [first, second]) => {
     }
     res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
     return res.status(200).json({
+      country,
+      currency: country === 'japan' ? 'JPY' : 'THB',
       categories: [...byCategory].map(([category, items]) => ({ category, items })),
     });
   }

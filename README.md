@@ -217,7 +217,7 @@ they are what establishes auth state in the first place.
 
 Items registered in the admin (Items page) are published through two public, read-only endpoints. They need no login, only return items marked "Show on the website menu", and never include cost or profit.
 
-- `GET /api/public/menu` returns `{ categories: [{ category, items: [{ item_id, name, description, group, price, photo_url }] }] }`, for example Cake → Design 1, Design 2.
+- `GET /api/public/menu` (Thailand, in THB) and `GET /api/public/menu?country=japan` (Japan, in JPY) return `{ categories: [{ category, items: [{ item_id, name, description, group, price, photo_url }] }] }`, for example Cake → Design 1, Design 2.
 - `GET /api/public/photo/:id` returns the item's image (the `photo_url` above points here).
 
 CORS is open (`*`) and responses are cached for 60 seconds.

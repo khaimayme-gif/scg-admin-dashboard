@@ -116,7 +116,8 @@ export default function App() {
         {page === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {page === 'qr' && <QRCodeGenerator />}
         {page === 'settings' && <Settings />}
-        {page === 'items' && <Items />}
+        {page === 'items-thailand' && <Items key="thailand" country="thailand" />}
+        {page === 'items-japan' && <Items key="japan" country="japan" />}
         {page === 'orders' && (
           <Orders intent={orderIntent} onIntentHandled={() => setOrderIntent(null)} />
         )}
