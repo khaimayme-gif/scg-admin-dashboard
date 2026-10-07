@@ -5,10 +5,14 @@ import type { QuotationForOrder } from './Orders';
 import { useRole } from './role';
 import { platformFeeJpy } from './platformFee';
 
+type PriceCurrency = 'THB' | 'JPY';
+type PayCurrency = 'THB' | 'JPY' | 'MMK';
+
 interface QuoteItem {
   name: string;
-  sellingPrice: number;
+  sellingPrice: number; // in the quotation's price currency
   originalPrice: number;
+  payPrice?: number; // in the currency the customer pays in
 }
 
 interface Quotation {
@@ -25,6 +29,11 @@ interface Quotation {
   total_mmk: number | null;
   total_jpy: number | null;
   platform_fee_jpy: number | null; // Japan quotations only
+  price_currency: PriceCurrency; // what the prices were typed in
+  pay_currency: PayCurrency; // what the customer is quoted and pays in
+  total_pay: number | null; // total in pay_currency, as quoted
+  rate_thb_to_jpy: number | null;
+  rate_thb_to_mmk: number | null;
   order_id: number | null; // set once "Make Order" has turned this quotation into an order
   order_no: string | null;
 }
@@ -44,6 +53,18 @@ const CHANNELS: Record<string, string> = { tiktok: 'TikTok', facebook: 'Facebook
 const PLACES = ['Thailand', 'Japan'];
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
+const money = (n: number, cur: string) => `${fmt(n)} ${cur}`;
+
+// Quotations made before currencies existed were in baht from start to finish.
+const payCur = (q: Quotation): PayCurrency => q.pay_currency ?? 'THB';
+const payTotal = (q: Quotation) => q.total_pay ?? q.total_thb;
+const payLine = (_q: Quotation, it: QuoteItem) => it.payPrice ?? it.sellingPrice;
+
+const PRICE_CURRENCIES: PriceCurrency[] = ['THB', 'JPY'];
+const PAY_CURRENCIES: PayCurrency[] = ['THB', 'JPY', 'MMK'];
+// Sensible defaults: Japan works in yen, everything else in baht.
+const defaultsFor = (place: string): { price: PriceCurrency; pay: PayCurrency } =>
+  place === 'Japan' ? { price: 'JPY', pay: 'JPY' } : { price: 'THB', pay: 'THB' };
 
 // en-CA formats as YYYY-MM-DD in the local timezone.
 const todayLocal = () => new Date().toLocaleDateString('en-CA');
@@ -64,6 +85,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
   const [channel, setChannel] = useState('tiktok');
   const [quoteDate, setQuoteDate] = useState(todayLocal());
   const [orderPlace, setOrderPlace] = useState('Thailand');
+  const [priceCurrency, setPriceCurrency] = useState<PriceCurrency>(isJapan ? 'JPY' : 'THB');
+  const [payCurrency, setPayCurrency] = useState<PayCurrency>(isJapan ? 'JPY' : 'THB');
   const [items, setItems] = useState<FormItem[]>([emptyItem()]);
 
   const [rates, setRates] = useState<Rates | null>(null);
@@ -117,12 +140,24 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
 
   // Live numbers for the form. The server recalculates the same figures when the quotation is saved.
   const namedItems = items.filter((it) => it.name.trim());
-  const totalThb = namedItems.reduce((sum, it) => sum + (Number(it.sellingPrice) || 0), 0);
-  const originalThb = namedItems.reduce((sum, it) => sum + (Number(it.originalPrice) || 0), 0);
-  const revenueThb = totalThb - originalThb;
-  // Japan quotations get the SochicGifts platform fee, worked out from the yen total.
+  const totalEntry = namedItems.reduce((sum, it) => sum + (Number(it.sellingPrice) || 0), 0);
+  const originalEntry = namedItems.reduce((sum, it) => sum + (Number(it.originalPrice) || 0), 0);
+  const revenueEntry = totalEntry - originalEntry;
   const feePlace = isJapan ? 'Japan' : orderPlace;
-  const platformFee = feePlace === 'Japan' && rates ? platformFeeJpy(Math.round(totalThb * rates.thbToJpy)) : null;
+
+  // Everything goes through THB with the Settings rates, like the server does.
+  const needsRates = priceCurrency === 'JPY' || payCurrency !== 'THB' || feePlace === 'Japan';
+  const ready = !needsRates || Boolean(rates);
+  const toThb = (amount: number, cur: PriceCurrency) => (cur === 'JPY' && rates ? amount / rates.thbToJpy : amount);
+  const fromThb = (thb: number, cur: PayCurrency) =>
+    !rates ? thb : cur === 'JPY' ? thb * rates.thbToJpy : cur === 'MMK' ? thb * rates.thbToMmk : thb;
+  const linePay = (selling: number) =>
+    priceCurrency === payCurrency ? selling : Math.round(fromThb(toThb(selling, priceCurrency), payCurrency));
+  const totalPay = namedItems.reduce((sum, it) => sum + linePay(Number(it.sellingPrice) || 0), 0);
+  const totalThb = toThb(totalEntry, priceCurrency);
+  // Japan quotations get the SochicGifts platform fee, worked out from the yen total.
+  const totalJpy = priceCurrency === 'JPY' ? totalEntry : rates ? Math.round(totalThb * rates.thbToJpy) : null;
+  const platformFee = feePlace === 'Japan' && totalJpy !== null ? platformFeeJpy(totalJpy) : null;
 
   const handleSubmit = async () => {
     if (!customerName.trim()) {
@@ -141,6 +176,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
         channel,
         quoteDate,
         orderPlace: isJapan ? 'Japan' : orderPlace,
+        priceCurrency,
+        payCurrency,
         items: namedItems.map((it) => ({
           name: it.name.trim(),
           sellingPrice: Number(it.sellingPrice) || 0,
@@ -167,7 +204,9 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
     setCustomerName('');
     setChannel('tiktok');
     setQuoteDate(todayLocal());
-    setOrderPlace('Thailand');
+    setOrderPlace(isJapan ? 'Japan' : 'Thailand');
+    setPriceCurrency(isJapan ? 'JPY' : 'THB');
+    setPayCurrency(isJapan ? 'JPY' : 'THB');
     setItems([emptyItem()]);
     setError('');
   };
@@ -188,8 +227,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
       const blob = await renderQuotationPng({
         quoteNo: q.quote_no,
         quoteDate: q.quote_date,
-        items: q.items.map((it) => ({ name: it.name, sellingPrice: it.sellingPrice })),
-        totalMmk: q.total_mmk,
+        currency: payCur(q),
+        items: q.items.map((it) => ({ name: it.name, sellingPrice: payLine(q, it) })),
       });
       downloadBlob(blob, `SCG-Quotation-${q.quote_no}.png`);
     } catch {
@@ -199,8 +238,6 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
     }
   };
 
-  const amountLine = (mmk: number | null, jpy: number | null) =>
-    mmk === null || jpy === null ? 'Set exchange rates in Settings' : `${fmt(mmk)} MMK and ${fmt(jpy)} Yen`;
 
   return (
     <div className="page">
@@ -223,13 +260,11 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
             <p>Order place: {lastQuotation.order_place}</p>
             <ol className="quote-lines">
               {lastQuotation.items.map((it, i) => (
-                <li key={i}>{it.name}: {fmt(it.sellingPrice)} THB</li>
+                <li key={i}>{it.name}: {money(payLine(lastQuotation, it), payCur(lastQuotation))}</li>
               ))}
             </ol>
             <p className="quote-total">
-              Quotation is {fmt(lastQuotation.total_thb)} THB in total.
-              <br />
-              ({amountLine(lastQuotation.total_mmk, lastQuotation.total_jpy)})
+              Quotation is {money(payTotal(lastQuotation), payCur(lastQuotation))} in total.
             </p>
           </div>
           <p className="stat-sub">
@@ -292,7 +327,12 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
             </div>
             <div className="order-field">
               <label>Order place</label>
-              <select className="item-input" value={isJapan ? 'Japan' : orderPlace} disabled={isJapan} onChange={(e) => setOrderPlace(e.target.value)}>
+              <select className="item-input" value={isJapan ? 'Japan' : orderPlace} disabled={isJapan} onChange={(e) => {
+                const place = e.target.value;
+                setOrderPlace(place);
+                setPriceCurrency(defaultsFor(place).price);
+                setPayCurrency(defaultsFor(place).pay);
+              }}>
                 {places.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
@@ -300,7 +340,27 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
             </div>
           </div>
 
-          <h3 className="order-subheading">Items (prices in THB)</h3>
+          <div className="order-form-grid">
+            <div className="order-field">
+              <label>Prices entered in</label>
+              <div className="toggle-group">
+                {PRICE_CURRENCIES.map((c) => (
+                  <button key={c} type="button" className={`toggle-btn ${priceCurrency === c ? 'is-active' : ''}`} onClick={() => setPriceCurrency(c)}>{c}</button>
+                ))}
+              </div>
+            </div>
+            <div className="order-field">
+              <label>Customer pays in (printed)</label>
+              <div className="toggle-group">
+                {PAY_CURRENCIES.map((c) => (
+                  <button key={c} type="button" className={`toggle-btn ${payCurrency === c ? 'is-active' : ''}`} onClick={() => setPayCurrency(c)}>{c}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {!ready && <p className="warn-text">Set the exchange rates in Settings to use this currency.</p>}
+
+          <h3 className="order-subheading">Items (prices in {priceCurrency})</h3>
           <div className="order-item-lines">
             {items.map((it, index) => (
               <div className="item-row" key={index}>
@@ -348,19 +408,15 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
           <div className="order-form-grid" style={{ marginTop: 16 }}>
             <div className="order-field">
               <label>Revenue (selling minus original, auto)</label>
-              <div className={`order-profit ${revenueThb < 0 ? 'profit-negative' : ''}`}>{fmt(revenueThb)} THB</div>
+              <div className={`order-profit ${revenueEntry < 0 ? 'profit-negative' : ''}`}>{money(revenueEntry, priceCurrency)}</div>
             </div>
             <div className="order-field">
-              <label>Quotation total</label>
-              <div className="order-profit">{fmt(totalThb)} THB</div>
+              <label>Total in {priceCurrency}</label>
+              <div className="order-profit">{money(totalEntry, priceCurrency)}</div>
             </div>
             <div className="order-field">
-              <label>In MMK</label>
-              <div className="order-profit">{rates ? `${fmt(totalThb * rates.thbToMmk)} MMK` : 'Set rates in Settings'}</div>
-            </div>
-            <div className="order-field">
-              <label>In Yen</label>
-              <div className="order-profit">{rates ? `${fmt(totalThb * rates.thbToJpy)} Yen` : 'Set rates in Settings'}</div>
+              <label>Customer pays ({payCurrency})</label>
+              <div className="order-profit">{ready ? money(totalPay, payCurrency) : 'Set rates in Settings'}</div>
             </div>
             {feePlace === 'Japan' && (
               <div className="order-field">
@@ -396,7 +452,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                   <th>Quotation</th>
                   <th>Customer</th>
                   <th>Status</th>
-                  <th className="num-col">Total</th>
+                  <th className="num-col">Customer pays</th>
                   <th></th>
                 </tr>
               </thead>
@@ -419,7 +475,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                             {q.order_id ? 'Ordered' : 'Quoted'}
                           </span>
                         </td>
-                        <td className="items-price-cell num-col">{fmt(q.total_thb)} THB</td>
+                        <td className="items-price-cell num-col">{money(payTotal(q), payCur(q))}</td>
                         <td className="row-action-cell">
                           <button
                             className={`details-btn ${isOpen ? 'is-open' : ''}`}
@@ -438,6 +494,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                               <dl className="detail-grid">
                                 <div><dt>Order place</dt><dd>{q.order_place}</dd></div>
                                 <div><dt>Channel</dt><dd>{CHANNELS[q.channel] ?? q.channel}</dd></div>
+                                <div><dt>Prices entered in</dt><dd>{q.price_currency ?? 'THB'}</dd></div>
                                 <div><dt>In MMK</dt><dd className="items-price-cell">{q.total_mmk === null ? '—' : `${fmt(q.total_mmk)} MMK`}</dd></div>
                                 <div><dt>In Yen</dt><dd className="items-price-cell">{q.total_jpy === null ? '—' : `${fmt(q.total_jpy)} Yen`}</dd></div>
                                 {q.platform_fee_jpy !== null && (
@@ -453,7 +510,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                                 <span className="detail-label">Items</span>
                                 <ul>
                                   {q.items.map((it, i) => (
-                                    <li key={i}><span>{it.name}: {fmt(it.sellingPrice)} THB</span></li>
+                                    <li key={i}><span>{it.name}: {money(payLine(q, it), payCur(q))}</span></li>
                                   ))}
                                 </ul>
                               </div>

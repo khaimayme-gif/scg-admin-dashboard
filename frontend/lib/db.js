@@ -242,6 +242,15 @@ function ensureSchema() {
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS platform_fee_jpy INTEGER`))
     .then(() => pool.query(`
       ALTER TABLE quotations ADD COLUMN IF NOT EXISTS platform_fee_jpy INTEGER`))
+    // Quotations: prices are typed in THB or JPY, and the customer can be quoted in THB, JPY or MMK.
+    // The rates used are kept so a saved quotation never changes when Settings do.
+    .then(() => pool.query(`
+      ALTER TABLE quotations
+        ADD COLUMN IF NOT EXISTS price_currency TEXT NOT NULL DEFAULT 'THB',
+        ADD COLUMN IF NOT EXISTS pay_currency TEXT NOT NULL DEFAULT 'THB',
+        ADD COLUMN IF NOT EXISTS total_pay REAL,
+        ADD COLUMN IF NOT EXISTS rate_thb_to_jpy REAL,
+        ADD COLUMN IF NOT EXISTS rate_thb_to_mmk REAL`))
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS board_comments (
         id SERIAL PRIMARY KEY,
