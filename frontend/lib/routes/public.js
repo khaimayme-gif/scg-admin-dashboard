@@ -18,7 +18,7 @@ module.exports = async (req, res, [first, second]) => {
   if (first === 'menu') {
     await ensureSchema();
     const result = await pool.query(
-      `SELECT id, category, item_code, name, description, menu_price,
+      `SELECT id, category, item_code, name, description, item_group, menu_price,
          (photo_data IS NOT NULL) AS has_photo, EXTRACT(EPOCH FROM updated_at)::bigint AS v
        FROM items WHERE published ORDER BY category, item_code NULLS LAST, name`
     );
@@ -31,6 +31,7 @@ module.exports = async (req, res, [first, second]) => {
         item_id: row.item_code,
         name: row.name,
         description: row.description,
+        group: row.item_group,
         price: row.menu_price,
         photo_url: row.has_photo ? `${origin}/api/public/photo/${row.id}?v=${row.v}` : null,
       });
