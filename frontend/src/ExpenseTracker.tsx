@@ -165,7 +165,7 @@ export default function ExpenseTracker() {
             What goes into running So Chic Gifts — domains, extra bouquets, giftboxes, and anything else you put money into.
           </p>
         </div>
-        <button className="new-order-btn" onClick={openNew}>+ New Expense</button>
+        <button className="new-order-btn" onClick={openNew}>New Expense</button>
       </header>
 
       {loading ? (

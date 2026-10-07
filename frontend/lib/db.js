@@ -80,6 +80,19 @@ function ensureSchema() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )`))
+    // Catalog fields that feed the public landing page menu (see routes/public.js).
+    .then(() => pool.query(`
+      ALTER TABLE items
+        ADD COLUMN IF NOT EXISTS item_code TEXT,
+        ADD COLUMN IF NOT EXISTS description TEXT,
+        ADD COLUMN IF NOT EXISTS photo_data TEXT,
+        ADD COLUMN IF NOT EXISTS photo_mime TEXT,
+        ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT TRUE
+    `))
+    .then(() => pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS items_item_code_unique
+        ON items (item_code) WHERE item_code IS NOT NULL
+    `))
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,

@@ -833,8 +833,9 @@ body {
   .app-content { padding: 24px 16px 56px; overflow-x: hidden; }
   .page-header { margin-bottom: 24px; }
   .page-header h1 { font-size: 26px; }
-  .page-header-row { flex-wrap: wrap; align-items: stretch; }
-  .page-header-row .new-order-btn { width: 100%; }
+  .page-header-row { flex-wrap: nowrap; align-items: flex-start; gap: 12px; }
+  .page-header-row .page-subtitle { font-size: 13px; }
+  .page-header-row .new-order-btn { flex-shrink: 0; padding: 10px 14px; font-size: 13px; }
 
   .calc-panel { padding: 20px 16px; }
   .calc-result-panel { position: static; }
@@ -887,3 +888,52 @@ body {
 @media (max-width: 400px) {
   .stat-grid { grid-template-columns: 1fr; }
 }
+
+/* ===== Item catalog (photo cards) ===== */
+.catalog-section { margin-bottom: 40px; }
+.catalog-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.catalog-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); }
+.catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 20px; }
+.item-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  padding: 16px; background: #fff; border: 1px solid var(--line); border-radius: 14px;
+  font-family: inherit; color: var(--ink); cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.item-card:hover { border-color: var(--pink); transform: translateY(-2px); }
+.item-card-photo { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; background: var(--blush); margin-bottom: 10px; }
+.item-card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.item-card-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.item-card-flag { position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 500; padding: 2px 9px; border-radius: 999px; background: rgba(58, 42, 47, 0.75); color: #fff; }
+.item-card-code { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--pink); }
+.item-card-name { font-size: 15px; font-weight: 600; }
+.item-card-desc { font-size: 13px; color: var(--muted); min-height: 18px; }
+.item-card-price { font-size: 17px; font-weight: 600; margin-top: 6px; }
+.item-card-cost { font-size: 12px; color: var(--muted); padding-top: 8px; margin-top: 6px; border-top: 1px dashed var(--line); width: 100%; }
+
+.photo-field { display: flex; gap: 18px; align-items: center; margin-bottom: 20px; }
+.photo-preview { width: 120px; height: 120px; flex-shrink: 0; border-radius: 12px; overflow: hidden; background: var(--blush); display: grid; place-items: center; font-size: 12px; color: var(--muted); text-align: center; }
+.photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.photo-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.photo-actions .add-item-btn { margin: 0; }
+.photo-actions .stat-sub { margin: 0; }
+.danger-link { color: var(--error); margin-left: auto; }
+.quote-latest { margin-bottom: 24px; }
+.quote-summary p { margin: 0 0 4px; }
+.quote-lines { margin: 10px 0; padding-left: 20px; }
+.quote-total { margin-top: 10px; font-weight: 600; }
+
+@media (max-width: 860px) {
+  .catalog-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .item-card { padding: 10px; }
+  .item-card-cost { font-size: 11px; }
+  .photo-field { flex-direction: column; align-items: flex-start; }
+  .page-header-row .new-order-btn { align-self: auto; }
+}
+.quote-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 4px 32px; font-size: 14px; color: var(--muted); }
+.quote-summary p { margin: 0; }
+.quote-summary p:first-child { grid-column: 1 / -1; font-size: 20px; color: var(--ink); margin-bottom: 6px; }
+.quote-summary .quote-lines { grid-column: 1 / -1; color: var(--ink); margin: 12px 0 4px; }
+.quote-summary .quote-total { grid-column: 1 / -1; color: var(--ink); font-size: 15px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.quote-latest .order-form-actions .save-btn { width: auto; margin: 0; min-width: 180px; }
+@media (max-width: 860px) { .quote-latest .order-form-actions .save-btn { width: 100%; } }

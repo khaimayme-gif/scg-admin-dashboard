@@ -212,3 +212,12 @@ they are what establishes auth state in the first place.
 - Preview deployments share `POSTGRES_URL` with production, so branches write to live data.
 - `api/` and `lib/` are plain JavaScript: no type checking, and Oxlint does not cover them. A
   mistake there deploys cleanly and fails at runtime.
+
+## Website menu API (for the So Chic Gifts landing page)
+
+Items registered in the admin (Items page) are published through two public, read-only endpoints. They need no login, only return items marked "Show on the website menu", and never include cost or profit.
+
+- `GET /api/public/menu` returns `{ categories: [{ category, items: [{ item_id, name, description, price, photo_url }] }] }`, for example Cake → Design 1, Design 2.
+- `GET /api/public/photo/:id` returns the item's image (the `photo_url` above points here).
+
+CORS is open (`*`) and responses are cached for 60 seconds.
