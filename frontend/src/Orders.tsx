@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { apiFetch, jsonBody } from './api';
 import { renderOrderPng } from './orderImage';
 import { downloadBlob } from './quotationImage';
@@ -282,6 +282,15 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
   const [selectedMonth, setSelectedMonth] = useState(todayLocal().slice(0, 7));
   const [view, setView] = useState<'monthly' | 'all'>('monthly');
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const toggleExpanded = (id: number) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [pageError, setPageError] = useState('');
 
   const loadAll = () =>
@@ -830,58 +839,92 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
               <p className="empty-state">No orders yet.</p>
             ) : (
               <div className="orders-table-wrap">
-                <table className="items-table">
+                <table className="items-table orders-compact">
                   <thead>
                     <tr>
-                      <th>Order ID</th>
-                      <th>Date</th>
+                      <th>Order</th>
                       <th>Customer</th>
-                      <th>Country</th>
-                      <th>Channel</th>
-                      <th>Items</th>
                       <th>Status</th>
-                      <th>Selling price</th>
-                      <th>Cost</th>
-                      <th>Revenue</th>
+                      <th className="num-col">Selling price</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {orders.map((o) => {
+                      const isOpen = expanded.has(o.id);
                       return (
-                        <tr key={o.id}>
-                          <td>{o.order_no ?? `#${o.id}`}</td>
-                          <td>{o.order_date}</td>
-                          <td>{o.customer_name}</td>
-                          <td>{o.country}</td>
-                          <td>{o.channel ? (CHANNELS[o.channel] ?? o.channel) : '—'}</td>
-                          <td>{itemsSummary(o.items)}</td>
-                          <td>
-                            <span className={`status-pill status-${o.status}`}>
-                              {STATUS_LABELS[o.status] ?? o.status}
-                            </span>
-                          </td>
-                          <td className="items-price-cell">{fmt(o.selling_price)} {o.currency}</td>
-                          <td className="items-price-cell">{fmt(o.cost)} {o.currency}</td>
-                          <td className={`items-price-cell ${o.revenue < 0 ? 'profit-negative' : ''}`}>
-                            {fmt(o.revenue)} {o.currency}
-                          </td>
-                          <td>
-                            <div className="quote-row-actions">
-                              <button className="order-edit-btn" onClick={() => startEdit(o)}>Edit</button>
+                        <Fragment key={o.id}>
+                          <tr className={isOpen ? 'is-open' : ''}>
+                            <td>
+                              <span className="cell-main">{o.order_no ?? `#${o.id}`}</span>
+                              <span className="cell-sub">{o.order_date}</span>
+                            </td>
+                            <td>
+                              <span className="cell-main">{o.customer_name}</span>
+                              <span className="cell-sub">{itemsSummary(o.items)}</span>
+                            </td>
+                            <td>
+                              <span className={`status-pill status-${o.status}`}>
+                                {STATUS_LABELS[o.status] ?? o.status}
+                              </span>
+                            </td>
+                            <td className="items-price-cell num-col">{fmt(o.selling_price)} {o.currency}</td>
+                            <td className="row-action-cell">
                               <button
-                                className="item-remove"
-                                onClick={() => downloadOrder(o)}
-                                disabled={downloadingId === o.id}
-                                aria-label="Download order details"
-                                title="Download order details"
+                                className={`details-btn ${isOpen ? 'is-open' : ''}`}
+                                onClick={() => toggleExpanded(o.id)}
+                                aria-expanded={isOpen}
                               >
-                                {downloadingId === o.id ? '…' : '⬇'}
+                                Details
+                                <span className="details-caret" aria-hidden="true">▾</span>
                               </button>
-                              <button className="item-remove" onClick={() => handleDelete(o)} aria-label="Delete order">×</button>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                          </tr>
+                          {isOpen && (
+                            <tr className="detail-row">
+                              <td colSpan={5}>
+                                <div className="order-detail">
+                                  <dl className="detail-grid">
+                                    <div><dt>Country</dt><dd>{o.country || '—'}</dd></div>
+                                    <div><dt>Channel</dt><dd>{o.channel ? (CHANNELS[o.channel] ?? o.channel) : '—'}</dd></div>
+                                    <div><dt>Cost</dt><dd className="items-price-cell">{fmt(o.cost)} {o.currency}</dd></div>
+                                    <div>
+                                      <dt>Revenue</dt>
+                                      <dd className={`items-price-cell ${o.revenue < 0 ? 'profit-negative' : ''}`}>{fmt(o.revenue)} {o.currency}</dd>
+                                    </div>
+                                    <div><dt>Recipient</dt><dd>{o.recipient || '—'}{o.recipient_phone ? ` · ${o.recipient_phone}` : ''}</dd></div>
+                                    <div><dt>Delivery date</dt><dd>{o.delivery_date || '—'}</dd></div>
+                                    <div className="detail-wide"><dt>Delivery address</dt><dd>{o.delivery_address || '—'}</dd></div>
+                                    {o.delivery_note && <div className="detail-wide"><dt>Delivery note</dt><dd>{o.delivery_note}</dd></div>}
+                                    {o.notes && <div className="detail-wide"><dt>Notes</dt><dd>{o.notes}</dd></div>}
+                                  </dl>
+                                  <div className="detail-items">
+                                    <span className="detail-label">Items</span>
+                                    <ul>
+                                      {o.items.map((it, i) => (
+                                        <li key={i}>
+                                          <span>{it.quantity > 1 ? `${it.quantity}× ` : ''}{it.name}</span>
+                                          {it.details && <small>{it.details}</small>}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                  <div className="detail-actions">
+                                    <button className="save-btn" onClick={() => startEdit(o)}>Edit order</button>
+                                    <button
+                                      className="add-item-btn"
+                                      onClick={() => downloadOrder(o)}
+                                      disabled={downloadingId === o.id}
+                                    >
+                                      {downloadingId === o.id ? 'Preparing…' : 'Download'}
+                                    </button>
+                                    <button className="order-edit-btn danger-link" onClick={() => handleDelete(o)}>Delete</button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </tbody>
