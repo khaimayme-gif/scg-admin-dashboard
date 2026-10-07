@@ -118,7 +118,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const CURRENCIES = ['THB', 'JPY', 'MMK'];
 const CHANNELS: Record<string, string> = { tiktok: 'TikTok', facebook: 'Facebook' };
-const COMMON_COUNTRIES = ['Japan', 'Thailand', 'Myanmar'];
+const COMMON_COUNTRIES = ['Japan', 'Thailand'];
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
 

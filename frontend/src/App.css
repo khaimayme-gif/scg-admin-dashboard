@@ -1118,3 +1118,20 @@ body {
   .ticket-modal { min-height: 0; }
   .stage-btn { padding: 8px 6px; font-size: 12px; }
 }
+
+/* Dashboard: filters and country table */
+.dash-filters { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.dash-filters .month-select { margin-left: auto; }
+.dash-table .num-col { text-align: right; white-space: nowrap; }
+.dash-table .cell-sub { margin-top: 2px; font-size: 11px; white-space: normal; }
+.dash-table tr.total-row td { border-top: 1px solid var(--line); background: #FFF8FA; font-weight: 500; }
+.orders-table-wrap:has(.dash-table) { overflow-x: auto; }
+.orders-table-wrap .dash-table { min-width: 0; }
+.dash-table th, .dash-table td { padding-left: 10px; padding-right: 10px; }
+.dash-table th { white-space: normal; }
+@media (max-width: 860px) { .orders-table-wrap .dash-table { min-width: 640px; } }
+@media (max-width: 860px) {
+  .dash-filters { flex-direction: column; align-items: stretch; }
+  .dash-filters .view-toggle { overflow-x: auto; }
+  .dash-filters .month-select { margin-left: 0; width: 100%; }
+}
