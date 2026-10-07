@@ -102,6 +102,22 @@ function ensureSchema() {
       INSERT INTO item_types (name, code)
       SELECT v.name, v.code FROM (VALUES ('Cake', 'CK'), ('Bouquet', 'BQ'), ('Balloons', 'BL')) AS v(name, code)
       WHERE NOT EXISTS (SELECT 1 FROM item_types)`))
+    // One-time: add the rest of the website menu's types. The flag keeps types you later delete
+    // or rename from coming back.
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS schema_flags (name TEXT PRIMARY KEY)`))
+    .then(() => pool.query(`
+      WITH flag AS (
+        INSERT INTO schema_flags (name) VALUES ('item_types_menu_v1') ON CONFLICT DO NOTHING RETURNING 1
+      )
+      INSERT INTO item_types (name, code)
+      SELECT v.name, v.code
+      FROM (VALUES
+        ('Photo Giftbox', 'PB'), ('Customized T-Shirts', 'TS'), ('Snack Box', 'SB'),
+        ('Pop Mart Blind Box', 'BX'), ('Chocolate Collection', 'CH'), ('QR Love Note', 'LN')
+      ) AS v(name, code)
+      WHERE EXISTS (SELECT 1 FROM flag)
+      ON CONFLICT DO NOTHING`))
     .then(() => pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS items_item_code_unique
         ON items (item_code) WHERE item_code IS NOT NULL
