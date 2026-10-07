@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { apiFetch, jsonBody } from './api';
+import { readItemsWorkbook } from './itemImport';
+import type { ImportRow } from './itemImport';
 
 interface Item {
   id: number;
@@ -12,6 +14,7 @@ interface Item {
   item_group: string | null;
   published: boolean;
   has_photo: boolean;
+  photo_name: string | null;
   photo_version: number;
 }
 
@@ -180,11 +183,175 @@ function TypesModal({ types, onClose, onChanged }: { types: ItemType[]; onClose:
   );
 }
 
+function ImportModal({ types, itemCount, onClose, onDone }: {
+  types: ItemType[];
+  itemCount: number;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [rows, setRows] = useState<ImportRow[] | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [readError, setReadError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [serverError, setServerError] = useState('');
+  const [serverRows, setServerRows] = useState<{ row: number; error: string }[]>([]);
+  const [confirmMore, setConfirmMore] = useState(false);
+  const [result, setResult] = useState<{ created: number; first: string; last: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const typeByName = new Map(types.map((t) => [t.name.trim().toLowerCase(), t]));
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    setReadError('');
+    setServerError('');
+    setServerRows([]);
+    setRows(null);
+    setFileName(file.name);
+    try {
+      setRows(await readItemsWorkbook(file));
+    } catch (err) {
+      setReadError(err instanceof Error ? err.message : 'Could not read that file.');
+    }
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  // The same checks the server makes, so problems show before anything is sent.
+  const problems = (rows ?? []).flatMap((r) => {
+    if (!typeByName.has(r.type.trim().toLowerCase())) return [{ line: r.line, error: `Unknown item type "${r.type}"` }];
+    if (!r.name) return [{ line: r.line, error: 'Item name is missing' }];
+    if (r.price === null || r.price < 0) return [{ line: r.line, error: 'Selling price is missing or not a number' }];
+    return [];
+  });
+
+  // Which Item IDs each type will get, in row order.
+  const summary = types
+    .map((t) => {
+      const count = (rows ?? []).filter((r) => r.type.trim().toLowerCase() === t.name.trim().toLowerCase()).length;
+      const start = Number(t.next_code.replace(/\D/g, ''));
+      const id = (n: number) => `${t.code}${String(n).padStart(2, '0')}`;
+      return { name: t.name, count, range: count ? (count === 1 ? id(start) : `${id(start)} to ${id(start + count - 1)}`) : '' };
+    })
+    .filter((s) => s.count > 0);
+  const hidden = (rows ?? []).filter((r) => !r.show).length;
+
+  const run = async () => {
+    if (!rows || problems.length > 0) return;
+    setImporting(true);
+    setServerError('');
+    setServerRows([]);
+    try {
+      const res = await apiFetch('/items/import', jsonBody({
+        rows: rows.map((r) => ({
+          type: r.type, group: r.group, name: r.name, detail: r.detail,
+          price: r.price, cost: r.cost, photoName: r.photoName, show: r.show,
+        })),
+      }));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setServerError(data.error || 'Could not import the items.');
+        setServerRows(Array.isArray(data.errors) ? data.errors : []);
+        return;
+      }
+      setResult(data);
+      onDone();
+    } catch {
+      // a 401 has already sent us back to login
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card types-card">
+        <div className="modal-header">
+          <h2 className="panel-label">Import items from Excel</h2>
+          <button className="item-remove" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        {result ? (
+          <>
+            <p className="order-profit">Imported {result.created} items ({result.first} to {result.last}).</p>
+            <p className="stat-sub">Photos can be added later: open an item and use “Upload photo”.</p>
+            <div className="order-form-actions">
+              <button className="save-btn" onClick={onClose}>Done</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="stat-sub">
+              Choose the filled-in import template (.xlsx). You will see what will be created before anything is saved.
+              Item IDs are given automatically, per type, in row order.
+            </p>
+            <input ref={fileRef} type="file" accept=".xlsx" hidden onChange={(e) => onFile(e.target.files?.[0])} />
+            <button className="add-item-btn" onClick={() => fileRef.current?.click()}>{fileName ? 'Choose another file' : 'Choose Excel file'}</button>
+            {fileName && <span className="stat-sub"> {fileName}</span>}
+            {readError && <p className="error-text">{readError}</p>}
+
+            {rows && (
+              <>
+                <h3 className="order-subheading">{rows.length} items found</h3>
+                <ul className="types-list">
+                  {summary.map((s) => (
+                    <li className="types-row" key={s.name}>
+                      <span className="types-name">{s.name}</span>
+                      <span className="types-count">{s.count} {s.count === 1 ? 'item' : 'items'}</span>
+                      <span className="types-code">{s.range}</span>
+                    </li>
+                  ))}
+                </ul>
+                {hidden > 0 && <p className="stat-sub">{hidden} {hidden === 1 ? 'item is' : 'items are'} marked “No” for the website menu.</p>}
+
+                {problems.length > 0 && (
+                  <div className="warn-text">
+                    Fix these rows in Excel and choose the file again:
+                    <ul className="import-problems">
+                      {problems.slice(0, 8).map((p) => <li key={p.line}>Row {p.line}: {p.error}</li>)}
+                    </ul>
+                    {problems.length > 8 && <span>and {problems.length - 8} more.</span>}
+                  </div>
+                )}
+
+                {itemCount > 0 && problems.length === 0 && (
+                  <label className="frame-toggle">
+                    <input type="checkbox" checked={confirmMore} onChange={(e) => setConfirmMore(e.target.checked)} />
+                    You already have {itemCount} items. Importing adds these as new items (nothing is replaced).
+                  </label>
+                )}
+
+                {serverError && <p className="error-text">{serverError}</p>}
+                {serverRows.length > 0 && (
+                  <ul className="import-problems">
+                    {serverRows.slice(0, 8).map((p) => <li key={p.row}>Row {p.row}: {p.error}</li>)}
+                  </ul>
+                )}
+
+                <div className="order-form-actions">
+                  <button
+                    className="save-btn"
+                    onClick={run}
+                    disabled={importing || problems.length > 0 || rows.length === 0 || (itemCount > 0 && !confirmMore)}
+                  >
+                    {importing ? 'Importing…' : `Import ${rows.length} items`}
+                  </button>
+                  <button className="add-item-btn" onClick={onClose} disabled={importing}>Cancel</button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Items() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [types, setTypes] = useState<ItemType[]>([]);
   const [showTypes, setShowTypes] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -326,6 +493,7 @@ export default function Items() {
           </p>
         </div>
         <div className="header-actions">
+          <button className="header-secondary-btn" onClick={() => setShowImport(true)}>Import</button>
           <button className="header-secondary-btn" onClick={() => setShowTypes(true)}>Item Types</button>
           <button className="new-order-btn" onClick={openNew}>New Item</button>
         </div>
@@ -374,6 +542,15 @@ export default function Items() {
             </section>
           ))}
         </>
+      )}
+
+      {showImport && (
+        <ImportModal
+          types={types}
+          itemCount={items.length}
+          onClose={() => setShowImport(false)}
+          onDone={() => { loadItems(); loadTypes(); }}
+        />
       )}
 
       {showTypes && (

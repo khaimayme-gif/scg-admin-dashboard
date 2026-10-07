@@ -89,7 +89,8 @@ function ensureSchema() {
         ADD COLUMN IF NOT EXISTS item_group TEXT,
         ADD COLUMN IF NOT EXISTS photo_data TEXT,
         ADD COLUMN IF NOT EXISTS photo_mime TEXT,
-        ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT TRUE
+        ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT TRUE,
+        ADD COLUMN IF NOT EXISTS photo_name TEXT
     `))
     // Item types (Cake, Bouquet, ...) are managed on the Items page. `code` is the Item ID prefix.
     .then(() => pool.query(`

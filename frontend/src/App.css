@@ -1135,3 +1135,4 @@ body {
   .dash-filters .view-toggle { overflow-x: auto; }
   .dash-filters .month-select { margin-left: 0; width: 100%; }
 }
+.import-problems { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
