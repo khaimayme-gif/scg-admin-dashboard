@@ -27,6 +27,8 @@ interface MonthStats {
   sellingThb: number;
   costThb: number;
   revenueThb: number;
+  platformFeeThb?: number;
+  totalRevenueThb?: number; // order revenue + SochicGifts platform fees
 }
 
 interface Stats {
@@ -127,8 +129,8 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
   const current = byMonth.get(thisMonth);
   const previous = byMonth.get(shiftMonth(thisMonth, -1));
 
-  const revenueNow = current?.revenueThb ?? 0;
-  const revenuePrev = previous?.revenueThb ?? 0;
+  const revenueNow = current?.totalRevenueThb ?? current?.revenueThb ?? 0;
+  const revenuePrev = previous?.totalRevenueThb ?? previous?.revenueThb ?? 0;
   const delta = revenuePrev > 0 ? Math.round(((revenueNow - revenuePrev) / revenuePrev) * 100) : null;
   const expensesNow = expenses ? expenses.oneTimeThisMonthThb + expenses.monthlyRunRateThb : 0;
 
@@ -150,7 +152,7 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
 
   const series = Array.from({ length: months }, (_, i) => {
     const month = shiftMonth(thisMonth, i - (months - 1));
-    return { month, revenue: byMonth.get(month)?.revenueThb ?? 0, orders: byMonth.get(month)?.orderCount ?? 0 };
+    return { month, revenue: byMonth.get(month)?.totalRevenueThb ?? byMonth.get(month)?.revenueThb ?? 0, orders: byMonth.get(month)?.orderCount ?? 0 };
   });
   const maxRevenue = Math.max(1, ...series.map((s) => s.revenue));
   const total = series.reduce((sum, s) => sum + s.revenue, 0);
@@ -196,6 +198,7 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
               <span className={`stat-value ${revenueNow < 0 ? 'profit-negative' : ''}`}>{fmt(revenueNow)} THB</span>
               <span className="stat-sub">
                 {delta === null ? 'No revenue last month to compare' : `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta)}% vs last month`}
+                {(current?.platformFeeThb ?? 0) > 0 && ` · incl. ${fmt(current?.platformFeeThb ?? 0)} THB fees`}
               </span>
             </div>
             <div className="stat-card">
@@ -243,7 +246,7 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
                 ))}
               </div>
             )}
-            <p className="stat-sub dash-foot">Revenue = what customers paid minus your cost, in THB. Total for the period: {fmt(total)} THB.</p>
+            <p className="stat-sub dash-foot">Revenue = what customers paid minus your cost, plus platform fees from Japan orders, in THB. Total for the period: {fmt(total)} THB.</p>
           </section>
 
           <section className="calc-panel dash-panel">

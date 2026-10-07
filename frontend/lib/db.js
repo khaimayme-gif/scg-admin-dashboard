@@ -239,6 +239,10 @@ function ensureSchema() {
         status = CASE WHEN status IN ('in_progress', 'delivered') THEN 'paid' ELSE status END
       WHERE EXISTS (SELECT 1 FROM flag)`))
     .then(() => pool.query(`
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS platform_fee_jpy INTEGER`))
+    .then(() => pool.query(`
+      ALTER TABLE quotations ADD COLUMN IF NOT EXISTS platform_fee_jpy INTEGER`))
+    .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS board_comments (
         id SERIAL PRIMARY KEY,
         order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,

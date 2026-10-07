@@ -3,6 +3,7 @@ import { apiFetch, jsonBody } from './api';
 import { renderQuotationPng, downloadBlob } from './quotationImage';
 import type { QuotationForOrder } from './Orders';
 import { useRole } from './role';
+import { platformFeeJpy } from './platformFee';
 
 interface QuoteItem {
   name: string;
@@ -23,6 +24,7 @@ interface Quotation {
   revenue_thb: number;
   total_mmk: number | null;
   total_jpy: number | null;
+  platform_fee_jpy: number | null; // Japan quotations only
   order_id: number | null; // set once "Make Order" has turned this quotation into an order
   order_no: string | null;
 }
@@ -118,6 +120,9 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
   const totalThb = namedItems.reduce((sum, it) => sum + (Number(it.sellingPrice) || 0), 0);
   const originalThb = namedItems.reduce((sum, it) => sum + (Number(it.originalPrice) || 0), 0);
   const revenueThb = totalThb - originalThb;
+  // Japan quotations get the SochicGifts platform fee, worked out from the yen total.
+  const feePlace = isJapan ? 'Japan' : orderPlace;
+  const platformFee = feePlace === 'Japan' && rates ? platformFeeJpy(Math.round(totalThb * rates.thbToJpy)) : null;
 
   const handleSubmit = async () => {
     if (!customerName.trim()) {
@@ -228,7 +233,9 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
             </p>
           </div>
           <p className="stat-sub">
-            Revenue {fmt(lastQuotation.revenue_thb)} THB, for you only, never shown to the customer.
+            Revenue {fmt(lastQuotation.revenue_thb)} THB
+            {lastQuotation.platform_fee_jpy !== null && ` · Platform fee ${fmt(lastQuotation.platform_fee_jpy)} Yen`}
+            , for you only, never shown to the customer.
           </p>
           <div className="order-form-actions">
             <button
@@ -355,6 +362,12 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
               <label>In Yen</label>
               <div className="order-profit">{rates ? `${fmt(totalThb * rates.thbToJpy)} Yen` : 'Set rates in Settings'}</div>
             </div>
+            {feePlace === 'Japan' && (
+              <div className="order-field">
+                <label>Platform fee (auto)</label>
+                <div className="order-profit">{platformFee === null ? 'Set rates in Settings' : `${fmt(platformFee)} Yen`}</div>
+              </div>
+            )}
           </div>
 
           {error && <p className="error-text">{error}</p>}
@@ -427,6 +440,9 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                                 <div><dt>Channel</dt><dd>{CHANNELS[q.channel] ?? q.channel}</dd></div>
                                 <div><dt>In MMK</dt><dd className="items-price-cell">{q.total_mmk === null ? '—' : `${fmt(q.total_mmk)} MMK`}</dd></div>
                                 <div><dt>In Yen</dt><dd className="items-price-cell">{q.total_jpy === null ? '—' : `${fmt(q.total_jpy)} Yen`}</dd></div>
+                                {q.platform_fee_jpy !== null && (
+                                  <div><dt>Platform fee</dt><dd className="items-price-cell">{fmt(q.platform_fee_jpy)} Yen</dd></div>
+                                )}
                                 <div><dt>Original cost</dt><dd className="items-price-cell">{fmt(q.original_thb)} THB</dd></div>
                                 <div>
                                   <dt>Revenue</dt>
