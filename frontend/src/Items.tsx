@@ -9,6 +9,7 @@ interface Item {
   original_cost: number | null;
   item_code: string | null;
   description: string | null;
+  item_group: string | null;
   published: boolean;
   has_photo: boolean;
   photo_version: number;
@@ -20,6 +21,7 @@ interface FormState {
   category: string;
   name: string;
   description: string;
+  itemGroup: string;
   menuPrice: string;
   originalCost: string;
   published: boolean;
@@ -30,7 +32,7 @@ interface FormState {
 
 const SUGGESTED_CATEGORIES = ['Cake', 'Bouquet', 'Balloons'];
 const emptyForm = (): FormState => ({
-  itemCode: '', category: '', name: '', description: '', menuPrice: '', originalCost: '',
+  itemCode: '', category: '', name: '', description: '', itemGroup: '', menuPrice: '', originalCost: '',
   published: true, photo: undefined, existingPhotoUrl: null,
 });
 
@@ -102,6 +104,7 @@ export default function Items() {
       category: item.category,
       name: item.name,
       description: item.description ?? '',
+      itemGroup: item.item_group ?? '',
       menuPrice: String(item.menu_price),
       originalCost: item.original_cost === null ? '' : String(item.original_cost),
       published: item.published,
@@ -139,6 +142,7 @@ export default function Items() {
         category: form.category.trim(),
         name: form.name.trim(),
         description: form.description,
+        itemGroup: form.itemGroup,
         menuPrice: Number(form.menuPrice),
         originalCost: form.originalCost === '' ? null : Number(form.originalCost),
         published: form.published,
@@ -220,7 +224,7 @@ export default function Items() {
                         )}
                         {!item.published && <span className="item-card-flag">Hidden</span>}
                       </div>
-                      <span className="item-card-code">{item.item_code ?? 'No ID'}</span>
+                      <span className="item-card-code">{item.item_code ?? 'No ID'}{item.item_group ? ` · ${item.item_group}` : ''}</span>
                       <span className="item-card-name">{item.name}</span>
                       <span className="item-card-desc">{item.description ?? ''}</span>
                       <span className="item-card-price">฿{fmt(item.menu_price)}</span>
@@ -283,6 +287,11 @@ export default function Items() {
                 <datalist id="item-categories">
                   {[...new Set([...SUGGESTED_CATEGORIES, ...categories])].map((c) => <option key={c} value={c} />)}
                 </datalist>
+              </div>
+              <div className="order-field">
+                <label>Group (optional)</label>
+                <input className="item-input" placeholder="e.g. Birthday Cake, Real Flowers" value={form.itemGroup}
+                  onChange={(e) => update('itemGroup', e.target.value)} />
               </div>
               <div className="order-field">
                 <label>Item name</label>

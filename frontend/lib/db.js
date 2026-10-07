@@ -85,6 +85,7 @@ function ensureSchema() {
       ALTER TABLE items
         ADD COLUMN IF NOT EXISTS item_code TEXT,
         ADD COLUMN IF NOT EXISTS description TEXT,
+        ADD COLUMN IF NOT EXISTS item_group TEXT,
         ADD COLUMN IF NOT EXISTS photo_data TEXT,
         ADD COLUMN IF NOT EXISTS photo_mime TEXT,
         ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT TRUE
