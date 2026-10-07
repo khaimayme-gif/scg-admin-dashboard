@@ -60,7 +60,6 @@ const payCur = (q: Quotation): PayCurrency => q.pay_currency ?? 'THB';
 const payTotal = (q: Quotation) => q.total_pay ?? q.total_thb;
 const payLine = (_q: Quotation, it: QuoteItem) => it.payPrice ?? it.sellingPrice;
 
-const PRICE_CURRENCIES: PriceCurrency[] = ['THB', 'JPY'];
 const PAY_CURRENCIES: PayCurrency[] = ['THB', 'JPY', 'MMK'];
 // Sensible defaults: Japan works in yen, everything else in baht.
 const defaultsFor = (place: string): { price: PriceCurrency; pay: PayCurrency } =>
@@ -85,7 +84,6 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
   const [channel, setChannel] = useState('tiktok');
   const [quoteDate, setQuoteDate] = useState(todayLocal());
   const [orderPlace, setOrderPlace] = useState('Thailand');
-  const [priceCurrency, setPriceCurrency] = useState<PriceCurrency>(isJapan ? 'JPY' : 'THB');
   const [payCurrency, setPayCurrency] = useState<PayCurrency>(isJapan ? 'JPY' : 'THB');
   const [items, setItems] = useState<FormItem[]>([emptyItem()]);
 
@@ -144,6 +142,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
   const originalEntry = namedItems.reduce((sum, it) => sum + (Number(it.originalPrice) || 0), 0);
   const revenueEntry = totalEntry - originalEntry;
   const feePlace = isJapan ? 'Japan' : orderPlace;
+  // Item prices are typed in yen for Japan and in baht for everywhere else.
+  const priceCurrency: PriceCurrency = feePlace === 'Japan' ? 'JPY' : 'THB';
 
   // Everything goes through THB with the Settings rates, like the server does.
   const needsRates = priceCurrency === 'JPY' || payCurrency !== 'THB' || feePlace === 'Japan';
@@ -176,7 +176,6 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
         channel,
         quoteDate,
         orderPlace: isJapan ? 'Japan' : orderPlace,
-        priceCurrency,
         payCurrency,
         items: namedItems.map((it) => ({
           name: it.name.trim(),
@@ -205,7 +204,6 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
     setChannel('tiktok');
     setQuoteDate(todayLocal());
     setOrderPlace(isJapan ? 'Japan' : 'Thailand');
-    setPriceCurrency(isJapan ? 'JPY' : 'THB');
     setPayCurrency(isJapan ? 'JPY' : 'THB');
     setItems([emptyItem()]);
     setError('');
@@ -330,7 +328,6 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
               <select className="item-input" value={isJapan ? 'Japan' : orderPlace} disabled={isJapan} onChange={(e) => {
                 const place = e.target.value;
                 setOrderPlace(place);
-                setPriceCurrency(defaultsFor(place).price);
                 setPayCurrency(defaultsFor(place).pay);
               }}>
                 {places.map((p) => (
@@ -341,14 +338,6 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
           </div>
 
           <div className="order-form-grid">
-            <div className="order-field">
-              <label>Prices entered in</label>
-              <div className="toggle-group">
-                {PRICE_CURRENCIES.map((c) => (
-                  <button key={c} type="button" className={`toggle-btn ${priceCurrency === c ? 'is-active' : ''}`} onClick={() => setPriceCurrency(c)}>{c}</button>
-                ))}
-              </div>
-            </div>
             <div className="order-field">
               <label>Customer pays in (printed)</label>
               <div className="toggle-group">

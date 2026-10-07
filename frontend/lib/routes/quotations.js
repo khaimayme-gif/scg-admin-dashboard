@@ -4,7 +4,6 @@ const { platformFeeJpy } = require('../platform-fee');
 
 const CHANNELS = ['tiktok', 'facebook'];
 const PLACES = ['Thailand', 'Japan', 'Myanmar'];
-const PRICE_CURRENCIES = ['THB', 'JPY']; // what the item prices are typed in
 const PAY_CURRENCIES = ['THB', 'JPY', 'MMK']; // what the customer is quoted and pays in
 
 const parse = (row) => ({ ...row, items: JSON.parse(row.items_json) });
@@ -50,7 +49,6 @@ module.exports = async (req, res, [first, second]) => {
 
   if (first === 'save' && req.method === 'POST') {
     const { customerName, channel, quoteDate, items } = req.body || {};
-    const priceCurrency = (req.body || {}).priceCurrency || 'THB';
     const payCurrency = (req.body || {}).payCurrency || 'THB';
     // The Japan admin can only quote for Japan, whatever was sent.
     const orderPlace = japan ? 'Japan' : (req.body || {}).orderPlace;
@@ -59,7 +57,8 @@ module.exports = async (req, res, [first, second]) => {
     }
     if (!CHANNELS.includes(channel)) return res.status(400).json({ error: 'Invalid channel' });
     if (!PLACES.includes(orderPlace)) return res.status(400).json({ error: 'Invalid order place' });
-    if (!PRICE_CURRENCIES.includes(priceCurrency)) return res.status(400).json({ error: 'Prices can be entered in THB or JPY' });
+    // Prices are typed in yen for Japan and in baht everywhere else; the browser doesn't choose.
+    const priceCurrency = orderPlace === 'Japan' ? 'JPY' : 'THB';
     if (!PAY_CURRENCIES.includes(payCurrency)) return res.status(400).json({ error: 'Invalid customer currency' });
 
     const cleanItems = (Array.isArray(items) ? items : [])
