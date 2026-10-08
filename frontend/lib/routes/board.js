@@ -26,7 +26,7 @@ module.exports = async (req, res, [first, second]) => {
               o.selling_price, o.items_json, o.delivery_address, o.notes,
               to_char(o.delivery_date, 'YYYY-MM-DD') AS delivery_date,
               to_char(o.order_date, 'YYYY-MM-DD') AS order_date,
-              o.board_stage, o.board_position,
+              o.board_stage, o.board_position, o.board_checks,
               (SELECT COUNT(*)::int FROM board_comments c WHERE c.order_id = o.id) AS comment_count
        FROM orders o
        ${japan ? "WHERE lower(btrim(o.country)) = 'japan'" : ''}
@@ -49,6 +49,23 @@ module.exports = async (req, res, [first, second]) => {
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
     return res.status(200).json({ id: orderId, stage, position: pos });
+  }
+
+  // Ticks an item on a ticket's checklist on or off.
+  if (first === 'check' && req.method === 'POST') {
+    const { orderId, key, checked } = req.body || {};
+    if (!Number.isInteger(orderId)) return res.status(400).json({ error: 'orderId must be a number' });
+    if (typeof key !== 'string' || !key || key.length > 300) return res.status(400).json({ error: 'Invalid item' });
+    if (!(await canTouch(orderId))) return res.status(404).json({ error: 'Order not found' });
+    // Remove first so ticking twice never duplicates, then add back when checked.
+    await pool.query(
+      `UPDATE orders SET board_checks = CASE WHEN $2::boolean
+           THEN (board_checks - $3::text) || to_jsonb($3::text)
+           ELSE board_checks - $3::text END
+       WHERE id = $1`,
+      [orderId, Boolean(checked), key]
+    );
+    return res.status(200).json({ orderId, key, checked: Boolean(checked) });
   }
 
   if (first === 'comments' && second && req.method === 'GET') {

@@ -1161,3 +1161,14 @@ body {
 .ticket.urgency-red .ticket-date { color: var(--u); font-weight: 600; }
 .urgency-dot { background: var(--u); }
 .ticket-move { background: rgba(255, 255, 255, 0.7); }
+
+/* Ticket checklist */
+.checklist { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.check-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 4px; border-radius: 8px; cursor: pointer; }
+.check-row:hover { background: #FFF8FA; }
+.check-row input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--pink); cursor: pointer; flex-shrink: 0; }
+.check-text { display: flex; flex-direction: column; font-size: 14px; min-width: 0; }
+.check-text small { color: var(--muted); font-size: 12px; white-space: pre-line; }
+.checklist li.is-done .check-name, .checklist li.is-done small { text-decoration: line-through; color: var(--muted); }
+.ticket-extras { display: inline-flex; align-items: center; gap: 10px; }
+.ticket-progress { color: var(--ok-ink); font-weight: 500; }

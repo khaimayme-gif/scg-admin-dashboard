@@ -26,6 +26,7 @@ interface Ticket {
   board_stage: Stage;
   board_position: number;
   comment_count: number;
+  board_checks: string[]; // ticked checklist items, as "index:name"
 }
 
 interface Comment {
@@ -86,6 +87,9 @@ const urgencyOf = (t: { board_stage: Stage; delivery_date: string | null }): Urg
   if (days <= 7) return 'yellow';
   return 'green';
 };
+
+// Checklist ticks are stored as "<position>:<name>", so editing an order's items un-ticks the lines that changed.
+const checkKey = (index: number, name: string) => `${index}:${name}`;
 
 const itemsSummary = (items: TicketItem[]) =>
   items.map((it) => (it.quantity > 1 ? `${it.quantity}× ${it.name}` : it.name)).join(', ');
@@ -164,6 +168,21 @@ export default function SochicBoard({ onOpenOrder, onNewOrder }: BoardProps) {
     setOverStage(null);
   };
 
+  const toggleCheck = async (id: number, key: string, checked: boolean) => {
+    setTickets((prev) => prev.map((t) => {
+      if (t.id !== id) return t;
+      const rest = (t.board_checks ?? []).filter((k) => k !== key);
+      return { ...t, board_checks: checked ? [...rest, key] : rest };
+    }));
+    try {
+      const res = await apiFetch('/board/check', jsonBody({ orderId: id, key, checked }));
+      if (!res.ok) throw new Error('check failed');
+    } catch {
+      setError('Could not save that tick. Reloaded the board.');
+      load();
+    }
+  };
+
   const bumpCount = (id: number, delta: number) =>
     setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, comment_count: Math.max(0, t.comment_count + delta) } : t)));
 
@@ -196,7 +215,14 @@ export default function SochicBoard({ onOpenOrder, onNewOrder }: BoardProps) {
             ) : (
               <span className="ticket-date is-none">No delivery date</span>
             )}
-            {t.comment_count > 0 && <span className="ticket-comments">💬 {t.comment_count}</span>}
+            <span className="ticket-extras">
+              {t.items.length > 0 && (t.board_checks ?? []).length > 0 && (
+                <span className="ticket-progress">
+                  ✓ {t.items.filter((it, i) => (t.board_checks ?? []).includes(checkKey(i, it.name))).length}/{t.items.length}
+                </span>
+              )}
+              {t.comment_count > 0 && <span className="ticket-comments">💬 {t.comment_count}</span>}
+            </span>
           </span>
         </button>
         <select
@@ -288,18 +314,20 @@ export default function SochicBoard({ onOpenOrder, onNewOrder }: BoardProps) {
           onMove={(stage) => moveTicket(opened.id, stage)}
           onOpenOrder={onOpenOrder}
           onCountChange={(delta) => bumpCount(opened.id, delta)}
+          onToggleCheck={(key, checked) => toggleCheck(opened.id, key, checked)}
         />
       )}
     </div>
   );
 }
 
-function TicketModal({ ticket, onClose, onMove, onOpenOrder, onCountChange }: {
+function TicketModal({ ticket, onClose, onMove, onOpenOrder, onCountChange, onToggleCheck }: {
   ticket: Ticket;
   onClose: () => void;
   onMove: (stage: Stage) => void;
   onOpenOrder?: (orderId: number) => void;
   onCountChange: (delta: number) => void;
+  onToggleCheck: (key: string, checked: boolean) => void;
 }) {
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [text, setText] = useState('');
@@ -381,14 +409,25 @@ function TicketModal({ ticket, onClose, onMove, onOpenOrder, onCountChange }: {
         </dl>
 
         <div className="detail-items">
-          <span className="detail-label">Items</span>
-          <ul>
-            {ticket.items.map((it, i) => (
-              <li key={i}>
-                <span>{it.quantity > 1 ? `${it.quantity}× ` : ''}{it.name}</span>
-                {it.details && <small>{it.details}</small>}
-              </li>
-            ))}
+          <span className="detail-label">
+            Checklist ({ticket.items.filter((it, i) => (ticket.board_checks ?? []).includes(checkKey(i, it.name))).length}/{ticket.items.length})
+          </span>
+          <ul className="checklist">
+            {ticket.items.map((it, i) => {
+              const key = checkKey(i, it.name);
+              const done = (ticket.board_checks ?? []).includes(key);
+              return (
+                <li key={key} className={done ? 'is-done' : ''}>
+                  <label className="check-row">
+                    <input type="checkbox" checked={done} onChange={(e) => onToggleCheck(key, e.target.checked)} />
+                    <span className="check-text">
+                      <span className="check-name">{it.quantity > 1 ? `${it.quantity}× ` : ''}{it.name}</span>
+                      {it.details && <small>{it.details}</small>}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
           </ul>
         </div>
 
