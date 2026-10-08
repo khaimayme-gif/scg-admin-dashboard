@@ -257,6 +257,10 @@ function ensureSchema() {
         ADD COLUMN IF NOT EXISTS total_pay REAL,
         ADD COLUMN IF NOT EXISTS rate_thb_to_jpy REAL,
         ADD COLUMN IF NOT EXISTS rate_thb_to_mmk REAL`))
+    // Ticks on an order's item checklist (see the So Chic Board ticket). Keys look like "2:Giftbox",
+    // so if the items are edited later the old ticks simply stop matching.
+    .then(() => pool.query(`
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS board_checks JSONB NOT NULL DEFAULT '[]'::jsonb`))
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS board_comments (
         id SERIAL PRIMARY KEY,
