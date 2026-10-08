@@ -209,6 +209,27 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
     setError('');
   };
 
+  // Saved quotations can't be edited, but the currency shown under the total can be switched.
+  const [switchingId, setSwitchingId] = useState<number | null>(null);
+  const changePayCurrency = async (q: Quotation, currency: PayCurrency) => {
+    if (currency === payCur(q)) return;
+    setSwitchingId(q.id);
+    setError('');
+    try {
+      const res = await apiFetch('/quotations/currency', jsonBody({ id: q.id, payCurrency: currency }));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Could not change the currency.');
+        return;
+      }
+      loadHistory();
+    } catch {
+      // a 401 has already sent us back to login
+    } finally {
+      setSwitchingId(null);
+    }
+  };
+
   const handleDelete = async (q: Quotation) => {
     if (!window.confirm(`Delete the quotation for ${q.customer_name}?`)) return;
     try {
@@ -247,6 +268,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
         </div>
         <button className="new-order-btn" onClick={startNew}>New Quotation</button>
       </header>
+
+      {!showForm && error && <p className="error-text">{error}</p>}
 
       {lastQuotation && (
         <div className="calc-panel quote-latest">
@@ -491,7 +514,27 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                                 <div><dt>Order place</dt><dd>{q.order_place}</dd></div>
                                 <div><dt>Channel</dt><dd>{CHANNELS[q.channel] ?? q.channel}</dd></div>
                                 <div><dt>Prices and total in</dt><dd>{priceCur(q)}</dd></div>
-                                <div><dt>Total also shown in</dt><dd>{payCur(q) === priceCur(q) ? '—' : `${payCur(q)}: ${fmt(payTotal(q))}`}</dd></div>
+                                <div className="detail-wide">
+                                  <dt>Total also shown in (printed under the total)</dt>
+                                  <dd>
+                                    <div className="toggle-group">
+                                      {PAY_CURRENCIES.map((c) => (
+                                        <button
+                                          key={c}
+                                          type="button"
+                                          className={`toggle-btn ${payCur(q) === c ? 'is-active' : ''}`}
+                                          disabled={switchingId === q.id}
+                                          onClick={() => changePayCurrency(q, c)}
+                                        >
+                                          {c === priceCur(q) ? `${c} only` : c}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    {payCur(q) !== priceCur(q) && (
+                                      <span className="cell-sub">≈ {money(payTotal(q), payCur(q))}</span>
+                                    )}
+                                  </dd>
+                                </div>
                                 <div><dt>In MMK</dt><dd className="items-price-cell">{q.total_mmk === null ? '—' : `${fmt(q.total_mmk)} MMK`}</dd></div>
                                 <div><dt>In Yen</dt><dd className="items-price-cell">{q.total_jpy === null ? '—' : `${fmt(q.total_jpy)} Yen`}</dd></div>
                                 {q.platform_fee_jpy !== null && (
