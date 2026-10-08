@@ -12,7 +12,6 @@ interface QuoteItem {
   name: string;
   sellingPrice: number; // in the quotation's price currency
   originalPrice: number;
-  payPrice?: number; // in the currency the customer pays in
 }
 
 interface Quotation {
@@ -56,9 +55,12 @@ const fmt = (n: number) => Math.round(n).toLocaleString();
 const money = (n: number, cur: string) => `${fmt(n)} ${cur}`;
 
 // Quotations made before currencies existed were in baht from start to finish.
+const priceCur = (q: Quotation): PriceCurrency => q.price_currency ?? 'THB';
 const payCur = (q: Quotation): PayCurrency => q.pay_currency ?? 'THB';
-const payTotal = (q: Quotation) => q.total_pay ?? q.total_thb;
-const payLine = (_q: Quotation, it: QuoteItem) => it.payPrice ?? it.sellingPrice;
+// Lines and the total are in the price currency; the pay currency only adds the total in it.
+const quoteTotal = (q: Quotation) => q.items.reduce((sum, it) => sum + it.sellingPrice, 0);
+const payTotal = (q: Quotation) => q.total_pay ?? quoteTotal(q);
+const alsoIn = (q: Quotation) => (payCur(q) !== priceCur(q) ? `≈ ${money(payTotal(q), payCur(q))}` : '');
 
 const PAY_CURRENCIES: PayCurrency[] = ['THB', 'JPY', 'MMK'];
 // Sensible defaults: Japan works in yen, everything else in baht.
@@ -151,10 +153,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
   const toThb = (amount: number, cur: PriceCurrency) => (cur === 'JPY' && rates ? amount / rates.thbToJpy : amount);
   const fromThb = (thb: number, cur: PayCurrency) =>
     !rates ? thb : cur === 'JPY' ? thb * rates.thbToJpy : cur === 'MMK' ? thb * rates.thbToMmk : thb;
-  const linePay = (selling: number) =>
-    priceCurrency === payCurrency ? selling : Math.round(fromThb(toThb(selling, priceCurrency), payCurrency));
-  const totalPay = namedItems.reduce((sum, it) => sum + linePay(Number(it.sellingPrice) || 0), 0);
   const totalThb = toThb(totalEntry, priceCurrency);
+  const totalPay = priceCurrency === payCurrency ? totalEntry : Math.round(fromThb(totalThb, payCurrency));
   // Japan quotations get the SochicGifts platform fee, worked out from the yen total.
   const totalJpy = priceCurrency === 'JPY' ? totalEntry : rates ? Math.round(totalThb * rates.thbToJpy) : null;
   const platformFee = feePlace === 'Japan' && totalJpy !== null ? platformFeeJpy(totalJpy) : null;
@@ -225,8 +225,9 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
       const blob = await renderQuotationPng({
         quoteNo: q.quote_no,
         quoteDate: q.quote_date,
-        currency: payCur(q),
-        items: q.items.map((it) => ({ name: it.name, sellingPrice: payLine(q, it) })),
+        currency: priceCur(q),
+        items: q.items.map((it) => ({ name: it.name, sellingPrice: it.sellingPrice })),
+        equivalent: payCur(q) !== priceCur(q) ? { currency: payCur(q), amount: payTotal(q) } : null,
       });
       downloadBlob(blob, `SCG-Quotation-${q.quote_no}.png`);
     } catch {
@@ -258,11 +259,12 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
             <p>Order place: {lastQuotation.order_place}</p>
             <ol className="quote-lines">
               {lastQuotation.items.map((it, i) => (
-                <li key={i}>{it.name}: {money(payLine(lastQuotation, it), payCur(lastQuotation))}</li>
+                <li key={i}>{it.name}: {money(it.sellingPrice, priceCur(lastQuotation))}</li>
               ))}
             </ol>
             <p className="quote-total">
-              Quotation is {money(payTotal(lastQuotation), payCur(lastQuotation))} in total.
+              Quotation is {money(quoteTotal(lastQuotation), priceCur(lastQuotation))} in total.
+              {alsoIn(lastQuotation) && <><br />({alsoIn(lastQuotation)})</>}
             </p>
           </div>
           <p className="stat-sub">
@@ -404,8 +406,10 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
               <div className="order-profit">{money(totalEntry, priceCurrency)}</div>
             </div>
             <div className="order-field">
-              <label>Customer pays ({payCurrency})</label>
-              <div className="order-profit">{ready ? money(totalPay, payCurrency) : 'Set rates in Settings'}</div>
+              <label>Total also shown in {payCurrency}</label>
+              <div className="order-profit">
+                {payCurrency === priceCurrency ? 'Same as the total' : ready ? `≈ ${money(totalPay, payCurrency)}` : 'Set rates in Settings'}
+              </div>
             </div>
             {feePlace === 'Japan' && (
               <div className="order-field">
@@ -441,7 +445,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                   <th>Quotation</th>
                   <th>Customer</th>
                   <th>Status</th>
-                  <th className="num-col">Customer pays</th>
+                  <th className="num-col">Total</th>
                   <th></th>
                 </tr>
               </thead>
@@ -464,7 +468,10 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                             {q.order_id ? 'Ordered' : 'Quoted'}
                           </span>
                         </td>
-                        <td className="items-price-cell num-col">{money(payTotal(q), payCur(q))}</td>
+                        <td className="items-price-cell num-col">
+                          {money(quoteTotal(q), priceCur(q))}
+                          {alsoIn(q) && <small className="cell-sub">{alsoIn(q)}</small>}
+                        </td>
                         <td className="row-action-cell">
                           <button
                             className={`details-btn ${isOpen ? 'is-open' : ''}`}
@@ -483,7 +490,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                               <dl className="detail-grid">
                                 <div><dt>Order place</dt><dd>{q.order_place}</dd></div>
                                 <div><dt>Channel</dt><dd>{CHANNELS[q.channel] ?? q.channel}</dd></div>
-                                <div><dt>Prices entered in</dt><dd>{q.price_currency ?? 'THB'}</dd></div>
+                                <div><dt>Prices and total in</dt><dd>{priceCur(q)}</dd></div>
+                                <div><dt>Total also shown in</dt><dd>{payCur(q) === priceCur(q) ? '—' : `${payCur(q)}: ${fmt(payTotal(q))}`}</dd></div>
                                 <div><dt>In MMK</dt><dd className="items-price-cell">{q.total_mmk === null ? '—' : `${fmt(q.total_mmk)} MMK`}</dd></div>
                                 <div><dt>In Yen</dt><dd className="items-price-cell">{q.total_jpy === null ? '—' : `${fmt(q.total_jpy)} Yen`}</dd></div>
                                 {q.platform_fee_jpy !== null && (
@@ -499,7 +507,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                                 <span className="detail-label">Items</span>
                                 <ul>
                                   {q.items.map((it, i) => (
-                                    <li key={i}><span>{it.name}: {money(payLine(q, it), payCur(q))}</span></li>
+                                    <li key={i}><span>{it.name}: {money(it.sellingPrice, priceCur(q))}</span></li>
                                   ))}
                                 </ul>
                               </div>
