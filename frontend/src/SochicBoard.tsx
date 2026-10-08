@@ -49,6 +49,16 @@ const PAYMENT_LABELS: Record<string, string> = {
 };
 
 const CLOSED_PAGE = 15;
+
+// How urgent a ticket is, from its delivery date. Only orders still being worked on (To do /
+// In progress) get a colour; Done and Closed are calm, and no date means nothing to measure.
+type Urgency = 'red' | 'orange' | 'yellow' | 'green' | 'none' | 'finished';
+const URGENCY_LEGEND: { id: Urgency; label: string }[] = [
+  { id: 'red', label: 'Overdue, today or tomorrow' },
+  { id: 'orange', label: '2 to 3 days' },
+  { id: 'yellow', label: '4 to 7 days' },
+  { id: 'green', label: 'More than a week' },
+];
 const fmt = (n: number) => Math.round(n).toLocaleString();
 const todayLocal = () => new Date().toLocaleDateString('en-CA');
 
@@ -65,6 +75,16 @@ const dayLabel = (iso: string) => {
   if (diff === -1) return 'Yesterday';
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+};
+
+const urgencyOf = (t: { board_stage: Stage; delivery_date: string | null }): Urgency => {
+  if (t.board_stage === 'done' || t.board_stage === 'closed') return 'finished';
+  if (!t.delivery_date) return 'none';
+  const days = daysFromToday(t.delivery_date);
+  if (days <= 1) return 'red';
+  if (days <= 3) return 'orange';
+  if (days <= 7) return 'yellow';
+  return 'green';
 };
 
 const itemsSummary = (items: TicketItem[]) =>
@@ -148,11 +168,12 @@ export default function SochicBoard({ onOpenOrder, onNewOrder }: BoardProps) {
     setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, comment_count: Math.max(0, t.comment_count + delta) } : t)));
 
   const card = (t: Ticket) => {
+    const urgency = urgencyOf(t);
     const late = t.delivery_date && (t.board_stage === 'todo' || t.board_stage === 'in_progress') && daysFromToday(t.delivery_date) < 0;
     return (
       <li
         key={t.id}
-        className={`ticket ${dragId === t.id ? 'is-dragging' : ''}`}
+        className={`ticket urgency-${urgency} ${dragId === t.id ? 'is-dragging' : ''}`}
         draggable
         onDragStart={(e) => { setDragId(t.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(t.id)); }}
         onDragEnd={() => { setDragId(null); setOverStage(null); }}
@@ -204,6 +225,11 @@ export default function SochicBoard({ onOpenOrder, onNewOrder }: BoardProps) {
       </header>
 
       <div className="board-tools">
+        <ul className="urgency-legend" aria-label="Card colours">
+          {URGENCY_LEGEND.map((u) => (
+            <li key={u.id}><span className={`urgency-dot urgency-${u.id}`} />{u.label}</li>
+          ))}
+        </ul>
         <input className="item-input board-search" placeholder="Search customer, order ID or item…" value={search}
           onChange={(e) => setSearch(e.target.value)} />
       </div>

@@ -1143,3 +1143,21 @@ body {
 .sidebar-caret.is-open { transform: rotate(180deg); }
 .sidebar-sublist { list-style: none; margin: 2px 0 4px 14px; padding: 0 0 0 10px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
 .sidebar-subitem { padding: 8px 12px; font-size: 13px; }
+
+/* Board: card colour by how soon the order has to be delivered */
+.board-tools { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.board-tools .board-search { order: 0; }
+.urgency-legend { order: 1; list-style: none; margin: 0; padding: 0; display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.urgency-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.urgency-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.ticket { border-left-width: 5px; }
+.ticket.urgency-red, .urgency-dot.urgency-red { --u: #D9435B; --u-bg: #FFF1F3; }
+.ticket.urgency-orange, .urgency-dot.urgency-orange { --u: #EE8A3A; --u-bg: #FFF5EB; }
+.ticket.urgency-yellow, .urgency-dot.urgency-yellow { --u: #E5B422; --u-bg: #FFFAE8; }
+.ticket.urgency-green, .urgency-dot.urgency-green { --u: #4DAA6B; --u-bg: #F0FAF3; }
+.ticket.urgency-none, .ticket.urgency-finished { --u: #D9CDD1; --u-bg: #fff; }
+.ticket[class*="urgency-"] { border-left-color: var(--u); background: var(--u-bg); }
+.ticket.urgency-finished { opacity: 0.85; }
+.ticket.urgency-red .ticket-date { color: var(--u); font-weight: 600; }
+.urgency-dot { background: var(--u); }
+.ticket-move { background: rgba(255, 255, 255, 0.7); }
