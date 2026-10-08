@@ -23,7 +23,9 @@ module.exports = async (req, res, [first, second]) => {
   // A quick glance at spend: what's gone out one-time this month, and the monthly-equivalent
   // "run rate" of everything recurring (yearly costs divided by 12), regardless of month.
   if (first === 'stats' && req.method === 'GET') {
-    const result = await pool.query('SELECT cost, currency, recurrence, expense_date FROM expenses');
+    const result = await pool.query(
+      "SELECT cost, currency, recurrence, to_char(expense_date, 'YYYY-MM') AS month FROM expenses"
+    );
     const thisMonth = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit' })
       .format(new Date());
 
@@ -41,7 +43,7 @@ module.exports = async (req, res, [first, second]) => {
       const cost = Number(row.cost) || 0;
       if (row.recurrence === 'monthly') monthlyRunRateThb += cost;
       else if (row.recurrence === 'yearly') monthlyRunRateThb += cost / 12;
-      else if (row.expense_date && row.expense_date.slice(0, 7) === thisMonth) oneTimeThisMonthThb += cost;
+      else if (row.month === thisMonth) oneTimeThisMonthThb += cost;
     }
 
     return res.status(200).json({

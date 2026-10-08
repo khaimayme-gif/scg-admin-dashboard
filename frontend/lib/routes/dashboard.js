@@ -82,7 +82,9 @@ module.exports = async (req, res, [first]) => {
   if (!japanOnly) {
     const thisMonth = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit' })
       .format(new Date());
-    const result = await pool.query('SELECT cost, currency, recurrence, expense_date FROM expenses');
+    const result = await pool.query(
+      "SELECT cost, currency, recurrence, to_char(expense_date, 'YYYY-MM') AS month FROM expenses"
+    );
     let oneTimeThisMonthThb = 0;
     let monthlyRunRateThb = 0;
     for (const row of result.rows) {
@@ -90,7 +92,7 @@ module.exports = async (req, res, [first]) => {
       if (cost === null) continue;
       if (row.recurrence === 'monthly') monthlyRunRateThb += cost;
       else if (row.recurrence === 'yearly') monthlyRunRateThb += cost / 12;
-      else if (row.expense_date && String(row.expense_date).slice(0, 7) === thisMonth) oneTimeThisMonthThb += cost;
+      else if (row.month === thisMonth) oneTimeThisMonthThb += cost;
     }
     expenses = {
       oneTimeThisMonthThb: Math.round(oneTimeThisMonthThb),
