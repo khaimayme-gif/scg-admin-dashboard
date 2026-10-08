@@ -943,7 +943,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                       <th>Order</th>
                       <th>Customer</th>
                       <th>Payment</th>
-                      <th className="num-col">Selling price</th>
+                      <th className="num-col">Revenue</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -966,7 +966,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                                 {STATUS_LABELS[o.status] ?? o.status}
                               </span>
                             </td>
-                            <td className="items-price-cell num-col">{fmt(o.selling_price)} {o.currency}</td>
+                            <td className={`items-price-cell num-col ${o.revenue < 0 ? 'profit-negative' : ''}`}>{fmt(o.revenue)} {o.currency}</td>
                             <td className="row-action-cell">
                               <button
                                 className={`details-btn ${isOpen ? 'is-open' : ''}`}
@@ -988,11 +988,8 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                                     {o.platform_fee_jpy !== null && (
                                       <div><dt>Platform fee</dt><dd className="items-price-cell">{fmt(o.platform_fee_jpy)} Yen</dd></div>
                                     )}
+                                    <div><dt>Selling price</dt><dd className="items-price-cell">{fmt(o.selling_price)} {o.currency}</dd></div>
                                     <div><dt>Cost</dt><dd className="items-price-cell">{fmt(o.cost)} {o.currency}</dd></div>
-                                    <div>
-                                      <dt>Revenue</dt>
-                                      <dd className={`items-price-cell ${o.revenue < 0 ? 'profit-negative' : ''}`}>{fmt(o.revenue)} {o.currency}</dd>
-                                    </div>
                                     <div><dt>Recipient</dt><dd>{o.recipient || '—'}{o.recipient_phone ? ` · ${o.recipient_phone}` : ''}</dd></div>
                                     <div><dt>Delivery date</dt><dd>{o.delivery_date || '—'}</dd></div>
                                     <div className="detail-wide"><dt>Delivery address</dt><dd>{o.delivery_address || '—'}</dd></div>
