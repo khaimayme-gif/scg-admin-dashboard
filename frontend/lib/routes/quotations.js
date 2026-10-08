@@ -88,18 +88,13 @@ module.exports = async (req, res, [first, second]) => {
     const toThb = (amount, cur) => (cur === 'JPY' ? amount / thbToJpy : amount);
     const fromThb = (thb, cur) => (cur === 'JPY' ? thb * thbToJpy : cur === 'MMK' ? thb * thbToMmk : thb);
 
-    // Each line is also converted on its own to what the customer pays in, so the printed lines
-    // add up exactly to the printed total.
-    cleanItems.forEach((i) => {
-      i.payPrice = priceCurrency === payCurrency
-        ? i.sellingPrice
-        : Math.round(fromThb(toThb(i.sellingPrice, priceCurrency), payCurrency));
-    });
+    // Item prices and the total stay in the price currency (THB for Thailand, JPY for Japan). The
+    // currency the customer pays in only adds the total in that currency, shown under the total.
     const totalEntry = cleanItems.reduce((sum, i) => sum + i.sellingPrice, 0);
     const originalEntry = cleanItems.reduce((sum, i) => sum + i.originalPrice, 0);
-    const totalPay = cleanItems.reduce((sum, i) => sum + i.payPrice, 0);
 
     const totalThb = toThb(totalEntry, priceCurrency);
+    const totalPay = priceCurrency === payCurrency ? totalEntry : Math.round(fromThb(totalThb, payCurrency));
     const originalThb = toThb(originalEntry, priceCurrency);
     const revenueThb = totalThb - originalThb;
     const totalMmk = thbToMmk ? Math.round(totalThb * thbToMmk) : null;

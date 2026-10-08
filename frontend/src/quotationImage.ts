@@ -12,8 +12,10 @@ import bowUrl from './assets/quotation-bow.png';
 export interface QuotationImageData {
   quoteNo: string; // e.g. 20260928-001
   quoteDate: string; // YYYY-MM-DD
-  currency: 'THB' | 'JPY' | 'MMK'; // what the customer pays in; every amount below is already in it
+  currency: 'THB' | 'JPY' | 'MMK'; // what the item prices and the total are in (THB for Thailand, JPY for Japan)
   items: { name: string; sellingPrice: number }[];
+  // When the customer pays in another currency, the total is also shown in it, small, under the total.
+  equivalent?: { currency: 'THB' | 'JPY' | 'MMK'; amount: number } | null;
 }
 
 const FONT = "'Inter', 'Noto Sans Myanmar', sans-serif";
@@ -179,6 +181,13 @@ export async function renderQuotationPng(data: QuotationImageData): Promise<Blob
   ctx.fillStyle = PINK;
   ctx.font = `700 ${ROW_SIZE}px ${FONT}`;
   ctx.fillText(withCurrency(total, data.currency), TEXT_R, totalY);
+
+  if (data.equivalent && data.equivalent.currency !== data.currency) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = GRAY;
+    ctx.font = `400 24px ${FONT}`;
+    ctx.fillText(`≈ ${withCurrency(data.equivalent.amount, data.equivalent.currency)}`, TEXT_R, totalY + 34);
+  }
 
   // Footer.
   ctx.textAlign = 'center';
