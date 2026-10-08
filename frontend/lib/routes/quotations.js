@@ -147,6 +147,39 @@ module.exports = async (req, res, [first, second]) => {
     return res.status(200).json(parse(row));
   }
 
+  // Changes the currency the customer pays in (the "≈ … MMK" line under the printed total) on a
+  // saved quotation. Prices and the total never change; the amount comes from the rates stored with
+  // the quotation, falling back to the current Settings rates for older ones.
+  if (first === 'currency' && req.method === 'POST') {
+    const { id, payCurrency } = req.body || {};
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'id must be a number' });
+    if (!PAY_CURRENCIES.includes(payCurrency)) return res.status(400).json({ error: 'Invalid customer currency' });
+    const found = await pool.query(
+      `SELECT * FROM quotations WHERE id = $1 AND ($2::boolean = false OR lower(btrim(order_place)) = 'japan')`,
+      [id, japan]
+    );
+    if (found.rowCount === 0) return res.status(404).json({ error: 'Quotation not found' });
+    const q = found.rows[0];
+
+    const current = (await pool.query('SELECT * FROM settings WHERE id = 1')).rows[0] || {};
+    const thbToJpy = q.rate_thb_to_jpy || current.rate_thb_to_jpy || null;
+    const thbToMmk = q.rate_thb_to_mmk || current.rate_thb_to_mmk || null;
+    const entry = q.price_currency || 'THB';
+    const totalEntry = entry === 'JPY' ? q.total_jpy : q.total_thb;
+
+    let totalPay = null;
+    if (payCurrency === entry) totalPay = totalEntry;
+    else if (payCurrency === 'THB') totalPay = Math.round(q.total_thb);
+    else if (payCurrency === 'JPY') totalPay = q.total_jpy ?? (thbToJpy ? Math.round(q.total_thb * thbToJpy) : null);
+    else totalPay = q.total_mmk ?? (thbToMmk ? Math.round(q.total_thb * thbToMmk) : null);
+    if (totalPay === null || totalPay === undefined) {
+      return res.status(400).json({ error: 'Set the exchange rates in Settings first.' });
+    }
+
+    await pool.query('UPDATE quotations SET pay_currency = $1, total_pay = $2 WHERE id = $3', [payCurrency, totalPay, id]);
+    return res.status(200).json({ id, payCurrency, totalPay });
+  }
+
   if (first === 'delete' && second && req.method === 'DELETE') {
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     const result = await pool.query(
