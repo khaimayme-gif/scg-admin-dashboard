@@ -1172,3 +1172,7 @@ body {
 .checklist li.is-done .check-name, .checklist li.is-done small { text-decoration: line-through; color: var(--muted); }
 .ticket-extras { display: inline-flex; align-items: center; gap: 10px; }
 .ticket-progress { color: var(--ok-ink); font-weight: 500; }
+
+.list-filter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.list-filter .month-select { min-width: 160px; }
+@media (max-width: 860px) { .list-filter { width: 100%; } .list-filter .month-select { flex: 1; } }

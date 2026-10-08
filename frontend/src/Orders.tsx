@@ -544,8 +544,15 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
 
   // Every month that has orders, plus the current month so it is always selectable.
   const monthOptions = Array.from(
-    new Set([todayLocal().slice(0, 7), selectedMonth, ...(stats?.monthly ?? []).map((m) => m.month)])
+    new Set([
+      todayLocal().slice(0, 7),
+      selectedMonth,
+      ...(stats?.monthly ?? []).map((m) => m.month),
+      ...orders.map((o) => o.order_date.slice(0, 7)),
+    ])
   ).sort((a, b) => b.localeCompare(a));
+  // The list follows the same filter as the cards above it: one month (this month by default) or everything.
+  const listedOrders = view === 'monthly' ? orders.filter((o) => o.order_date.slice(0, 7) === selectedMonth) : orders;
   const monthTotals: MonthStats = stats?.monthly.find((m) => m.month === selectedMonth) ?? {
     month: selectedMonth, orderCount: 0, cancelledCount: 0, sellingThb: 0, costThb: 0, revenueThb: 0,
   };
@@ -892,9 +899,42 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
           {pageError && <p className="error-text">{pageError}</p>}
 
           <div className="calc-panel">
-            <h2 className="panel-label">All orders</h2>
-            {orders.length === 0 ? (
-              <p className="empty-state">No orders yet.</p>
+            <div className="dash-panel-head">
+              <h2 className="panel-label">{view === 'monthly' ? `Orders · ${monthLabel(selectedMonth)}` : 'All orders'}</h2>
+              <div className="list-filter">
+                <div className="view-toggle">
+                  <button
+                    className={`view-toggle-btn ${view === 'monthly' ? 'is-active' : ''}`}
+                    onClick={() => setView('monthly')}
+                  >
+                    By month
+                  </button>
+                  <button
+                    className={`view-toggle-btn ${view === 'all' ? 'is-active' : ''}`}
+                    onClick={() => setView('all')}
+                  >
+                    All
+                  </button>
+                </div>
+                {view === 'monthly' && (
+                  <select
+                    className="item-input month-select"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    aria-label="Month"
+                  >
+                    {monthOptions.map((ym) => (
+                      <option key={ym} value={ym}>{monthLabel(ym)}</option>
+                    ))}
+                  </select>
+                )}
+                <span className="items-count">{listedOrders.length} {listedOrders.length === 1 ? 'order' : 'orders'}</span>
+              </div>
+            </div>
+            {listedOrders.length === 0 ? (
+              <p className="empty-state">
+                {orders.length === 0 ? 'No orders yet.' : `No orders in ${monthLabel(selectedMonth)}. Choose another month or "All".`}
+              </p>
             ) : (
               <div className="orders-table-wrap">
                 <table className="items-table orders-compact">
@@ -908,7 +948,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((o) => {
+                    {listedOrders.map((o) => {
                       const isOpen = expanded.has(o.id);
                       return (
                         <Fragment key={o.id}>
