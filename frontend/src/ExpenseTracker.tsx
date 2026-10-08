@@ -77,11 +77,11 @@ export default function ExpenseTracker() {
     setLoading(true);
     Promise.all([
       apiFetch('/expenses').then((res) => res.json()),
-      apiFetch('/expenses/stats').then((res) => res.json()),
+      apiFetch('/expenses/stats').then((res) => (res.ok ? res.json() : null)).catch(() => null),
     ])
       .then(([expenseRows, statRow]) => {
-        setExpenses(expenseRows);
-        setStats(statRow);
+        setExpenses(Array.isArray(expenseRows) ? expenseRows : []);
+        setStats(statRow && typeof statRow.oneTimeThisMonthThb === 'number' ? statRow : null);
         setLoading(false);
       })
       .catch(() => setLoading(false));
