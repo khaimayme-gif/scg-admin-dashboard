@@ -23,6 +23,8 @@ const MODULES: Module[] = [
   { id: 'dashboard', label: 'Dashboard', ready: true },
   { id: 'board', label: 'So Chic Board', ready: true },
   { id: 'quotation', label: 'Quotation', ready: true },
+  { id: 'orders', label: 'Orders', ready: true },
+  { id: 'qr', label: 'QR Code Generator', ready: true },
   {
     id: 'items',
     label: 'Items',
@@ -32,10 +34,8 @@ const MODULES: Module[] = [
       { id: 'items-japan', label: 'Japan' },
     ],
   },
-  { id: 'qr', label: 'QR Code Generator', ready: true },
-  { id: 'orders', label: 'Orders', ready: true },
-  { id: 'templates', label: 'Template Library', ready: false },
   { id: 'expenses', label: 'Expense Tracker', ready: true },
+  { id: 'templates', label: 'Template Library', ready: false },
   { id: 'settings', label: 'Settings', ready: true },
 ];
 
