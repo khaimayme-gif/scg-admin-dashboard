@@ -61,6 +61,9 @@ repo. Set them for Preview as well as Production, or preview deployments will no
 | `POSTGRES_URL` | Postgres connection string (Supabase) | every data route 500s |
 | `ADMIN_PASSWORD` | the single shared password | sign-in always rejects |
 | `SESSION_SECRET` | HMAC key for session cookies | **sign-in is disabled on purpose** |
+| `SUPABASE_URL` | Supabase project URL, for Template Library video uploads | uploading a template video says uploads aren't set up; everything else works |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only, never sent to the browser) | same as above |
+| `SUPABASE_TEMPLATE_BUCKET` | optional, storage bucket name, default `template-videos` | the default is used |
 
 `SESSION_SECRET` has no fallback by design. Session cookies are `<expiry>.<hmac>`, so a
 predictable secret would let anyone forge an admin session. If it is unset the app logs an
@@ -186,9 +189,15 @@ currencies.
 
 ## Modules
 
-Live: **Price Calculator, Items, QR Code Generator, Settings**.
+Live: **Price Calculator, Items, QR Code Generator, Settings, Template Library**.
 
-Not built: Orders, Customer Database, Template Library, Gift Packages, Delivery Schedule,
+**Template Library** manages the digital gift templates on the landing page's `templates.html`, which
+reads them from `GET /api/public/templates`. Preview videos are uploaded from the browser straight to
+a public Supabase Storage bucket using a signed URL from `POST /api/templates/upload-url`, because
+they are too big for the function's ~4.5 MB request limit. The first time, "Import templates from
+the website" fills the empty library from `lib/template-seed.js`.
+
+Not built: Orders, Customer Database, Gift Packages, Delivery Schedule,
 Expense Tracker, Monthly Profit. These appear in the sidebar disabled with a "soon" badge —
 [`src/Sidebar.tsx`](frontend/src/Sidebar.tsx) is the source of truth.
 

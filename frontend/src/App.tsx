@@ -10,6 +10,7 @@ import Items from './Items';
 import Orders from './Orders';
 import type { OrderIntent, QuotationForOrder } from './Orders';
 import ExpenseTracker from './ExpenseTracker';
+import Templates from './Templates';
 import Dashboard from './Dashboard';
 import { RoleContext, ROLE_PAGES, ROLE_HOME } from './role';
 import type { Role } from './role';
@@ -122,6 +123,7 @@ export default function App() {
           <Orders intent={orderIntent} onIntentHandled={() => setOrderIntent(null)} />
         )}
         {page === 'expenses' && <ExpenseTracker />}
+        {page === 'templates' && <Templates />}
       </main>
     </div>
     </RoleContext.Provider>

@@ -35,7 +35,7 @@ const MODULES: Module[] = [
     ],
   },
   { id: 'expenses', label: 'Expense Tracker', ready: true },
-  { id: 'templates', label: 'Template Library', ready: false },
+  { id: 'templates', label: 'Template Library', ready: true },
   { id: 'settings', label: 'Settings', ready: true },
 ];
 

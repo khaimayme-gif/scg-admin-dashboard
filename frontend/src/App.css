@@ -1176,3 +1176,24 @@ body {
 .list-filter { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .list-filter .month-select { min-width: 160px; }
 @media (max-width: 860px) { .list-filter { width: 100%; } .list-filter .month-select { flex: 1; } }
+
+/* ===== Template Library ===== */
+.tpl-admin-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.tpl-admin-card { cursor: default; padding: 0; overflow: hidden; }
+.tpl-admin-card.is-hidden { opacity: 0.6; }
+.tpl-admin-open { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; padding: 14px 14px 6px; background: none; border: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.tpl-admin-video { position: relative; width: 100%; aspect-ratio: 9 / 16; max-height: 300px; border-radius: 10px; overflow: hidden; background: var(--blush); margin-bottom: 10px; }
+.tpl-admin-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tpl-admin-order { display: flex; gap: 6px; padding: 0 14px 14px; }
+.tpl-admin-order .toggle-btn { padding: 4px 12px; }
+.tpl-admin-order .toggle-btn:disabled { opacity: 0.35; cursor: default; }
+.tpl-admin-form { display: flex; gap: 22px; align-items: flex-start; }
+.tpl-admin-video-lg { width: 180px; flex-shrink: 0; max-height: none; }
+.tpl-admin-fields { flex: 1; min-width: 0; }
+.tpl-admin-cats { flex-wrap: wrap; }
+.tpl-admin-upload { cursor: pointer; margin: 0; }
+.tpl-admin-check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); margin-bottom: 8px; cursor: pointer; }
+@media (max-width: 860px) {
+  .tpl-admin-form { flex-direction: column; }
+  .tpl-admin-video-lg { width: 140px; }
+}

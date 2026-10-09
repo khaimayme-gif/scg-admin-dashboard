@@ -3,6 +3,7 @@
 //
 //   GET /api/public/menu        -> { categories: [{ category, items: [...] }] }
 //   GET /api/public/photo/:id   -> the item's image
+//   GET /api/public/templates   -> { templates: [...] } published digital gift templates, in order
 const { pool, ensureSchema } = require('../db');
 
 function cors(res) {
@@ -45,6 +46,16 @@ module.exports = async (req, res, [first, second]) => {
       currency: country === 'japan' ? 'JPY' : 'THB',
       categories: [...byCategory].map(([category, items]) => ({ category, items })),
     });
+  }
+
+  if (first === 'templates') {
+    await ensureSchema();
+    const result = await pool.query(
+      `SELECT id, name, occasion, categories, price, description, video_url
+       FROM templates WHERE published ORDER BY sort_order, id`
+    );
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    return res.status(200).json({ templates: result.rows });
   }
 
   if (first === 'photo' && second) {
