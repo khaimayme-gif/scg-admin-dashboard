@@ -28,6 +28,7 @@ const ROUTES = {
   dashboard: require('../lib/routes/dashboard'),
   board: require('../lib/routes/board'),
   public: require('../lib/routes/public'),
+  templates: require('../lib/routes/templates'),
 };
 
 // The rewrite preserves the original path in req.url and also passes it as ?apiPath=. Prefer

@@ -270,6 +270,22 @@ function ensureSchema() {
       )`))
     .then(() => pool.query(`
       CREATE INDEX IF NOT EXISTS board_comments_order ON board_comments (order_id, created_at)`))
+    // Digital gift templates shown on the landing page's templates.html. Videos live in Supabase
+    // Storage (or any https URL); only the URL is stored here.
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS templates (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        occasion TEXT,
+        categories TEXT[] NOT NULL DEFAULT '{}',
+        price INTEGER,
+        description TEXT,
+        video_url TEXT,
+        published BOOLEAN NOT NULL DEFAULT TRUE,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`))
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,
