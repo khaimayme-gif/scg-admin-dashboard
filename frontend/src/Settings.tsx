@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiFetch, jsonBody } from './api';
+import UsersSection from './UsersSection';
 
 export default function Settings() {
   const [rateThbToJpy, setRateThbToJpy] = useState('');
@@ -45,7 +46,7 @@ export default function Settings() {
     <div className="page">
       <header className="page-header">
         <h1>Settings</h1>
-        <p className="page-subtitle">Exchange rates used to show quotes in all three currencies.</p>
+        <p className="page-subtitle">Exchange rates used to show quotes in all three currencies, and the people who can sign in.</p>
       </header>
 
       <div className="calc-panel" style={{ maxWidth: 420 }}>
@@ -112,6 +113,8 @@ export default function Settings() {
 
         {status === 'error' && <p className="error-text">{errorMsg}</p>}
       </div>
+
+      <UsersSection />
     </div>
   );
 }

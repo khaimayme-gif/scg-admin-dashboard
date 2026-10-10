@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { apiFetch, jsonBody } from './api';
 import { renderOrderPng } from './orderImage';
 import { downloadBlob } from './quotationImage';
-import { useRole } from './role';
+import { useRole, lockedCountryOf } from './role';
 import { platformFeeJpy } from './platformFee';
 
 interface OrderItem {
@@ -296,7 +296,7 @@ interface OrdersProps {
 
 export default function Orders({ intent = null, onIntentHandled }: OrdersProps) {
   // The Japan admin only works with Japan orders; the server enforces it too.
-  const isJapan = useRole() === 'japan';
+  const lockedCountry = lockedCountryOf(useRole()); // 'Japan' | 'Thailand' | null
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
@@ -461,7 +461,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
   // Saves the order. With andDownload, also produces the confirmation image from what the
   // server saved, so the image always matches the stored order and carries its order number.
   const handleSubmit = async (andDownload = false) => {
-    if (!form.customerName.trim() || !(isJapan ? 'Japan' : form.country).trim()) {
+    if (!form.customerName.trim() || !(lockedCountry ?? form.country).trim()) {
       setFormError('Customer name and country are required.');
       return;
     }
@@ -473,7 +473,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
         id: form.id ?? undefined,
         quotationId: form.id ? undefined : form.quotationId ?? undefined,
         customerName: form.customerName,
-        country: isJapan ? 'Japan' : form.country,
+        country: lockedCountry ?? form.country,
         channel: form.channel,
         orderDate: form.orderDate,
         status: form.status,
@@ -601,9 +601,9 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                 )}
               </div>
               {view === 'monthly' ? (
-                <StatCards totals={monthTotals} cancelledCount={monthTotals.cancelledCount} showFees={!isJapan} />
+                <StatCards totals={monthTotals} cancelledCount={monthTotals.cancelledCount} showFees={!lockedCountry} />
               ) : (
-                <StatCards totals={stats} cancelledCount={stats.cancelledCount} showFees={!isJapan} />
+                <StatCards totals={stats} cancelledCount={stats.cancelledCount} showFees={!lockedCountry} />
               )}
               {stats.unconverted > 0 && (
                 <p className="error-text">
@@ -644,12 +644,12 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                   className="item-input"
                   list="order-countries"
                   placeholder="e.g. Japan"
-                  value={isJapan ? 'Japan' : form.country}
-                  disabled={isJapan}
+                  value={lockedCountry ?? form.country}
+                  disabled={lockedCountry !== null}
                   onChange={(e) => update('country', e.target.value)}
                 />
                 <datalist id="order-countries">
-                  {(isJapan ? ['Japan'] : COMMON_COUNTRIES).map((c) => (
+                  {(lockedCountry ? [lockedCountry] : COMMON_COUNTRIES).map((c) => (
                     <option key={c} value={c} />
                   ))}
                 </datalist>
@@ -748,7 +748,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
               are the lines under each item, one per line (design, text on cake, size, colour, message…).
             </p>
             <datalist id="order-catalog-items">
-              {catalog.filter((c) => c.country === ((isJapan ? 'Japan' : form.country).trim().toLowerCase() === 'japan' ? 'japan' : 'thailand')).map((c) => (
+              {catalog.filter((c) => c.country === ((lockedCountry ?? form.country).trim().toLowerCase() === 'japan' ? 'japan' : 'thailand')).map((c) => (
                 <option key={c.id} value={c.name} />
               ))}
             </datalist>
@@ -861,7 +861,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                   {fmt(formRevenue)} {form.currency}
                 </div>
               </div>
-              {(isJapan ? 'Japan' : form.country).trim().toLowerCase() === 'japan' && (
+              {(lockedCountry ?? form.country).trim().toLowerCase() === 'japan' && (
                 <div className="order-field">
                   <label>Platform fee (auto, in yen)</label>
                   <div className="order-profit">

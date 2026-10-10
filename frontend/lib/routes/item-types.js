@@ -1,4 +1,4 @@
-const { requireAuth } = require('../auth');
+const { requireAuth, scopeOf } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 
 const CODE_PATTERN = /^[A-Z0-9]{1,4}$/;
@@ -16,11 +16,11 @@ function nextCode(prefix, itemCodes) {
 }
 
 module.exports = async (req, res, [first, second]) => {
-  const session = requireAuth(req, res);
+  const session = await requireAuth(req, res);
   if (!session) return;
   await ensureSchema();
 
-  // Everyone can read the types (the Japan admin needs them to add items); only the super admin
+  // Everyone can read the types (country admins need them to add items); only the super admin
   // can change them.
   if ((first === 'save' || first === 'delete') && session.role !== 'superadmin') {
     return res.status(403).json({ error: 'You do not have access to this' });
@@ -29,7 +29,7 @@ module.exports = async (req, res, [first, second]) => {
   if (!first && req.method === 'GET') {
     // Item IDs and counts are per country catalog.
     const requested = new URL(req.url, 'http://localhost').searchParams.get('country');
-    const country = session.role === 'japan' ? 'japan' : requested === 'japan' ? 'japan' : 'thailand';
+    const country = scopeOf(session) || (requested === 'japan' ? 'japan' : 'thailand');
     const [types, codes, counts] = await Promise.all([
       pool.query('SELECT id, name, code FROM item_types ORDER BY id'),
       pool.query('SELECT item_code FROM items WHERE item_code IS NOT NULL AND country = $1', [country]),

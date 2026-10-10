@@ -10,7 +10,7 @@ const EXPENSE_COLUMNS = `id, name, to_char(expense_date, 'YYYY-MM-DD') AS expens
 const cleanText = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
 module.exports = async (req, res, [first, second]) => {
-  if (!requireSuper(req, res)) return;
+  if (!await requireSuper(req, res)) return;
   await ensureSchema();
 
   if (!first && req.method === 'GET') {

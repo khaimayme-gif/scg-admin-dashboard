@@ -358,7 +358,7 @@ function ImportModal({ country, types, itemCount, onClose, onDone }: {
 }
 
 export default function Items({ country }: { country: Country }) {
-  const isJapanRole = useRole() === 'japan';
+  const isSuperAdmin = useRole() === 'superadmin';
   const money = CURRENCY[country];
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -508,7 +508,7 @@ export default function Items({ country }: { country: Country }) {
         </div>
         <div className="header-actions">
           <button className="header-secondary-btn" onClick={() => setShowImport(true)}>Import</button>
-          {!isJapanRole && <button className="header-secondary-btn" onClick={() => setShowTypes(true)}>Item Types</button>}
+          {isSuperAdmin && <button className="header-secondary-btn" onClick={() => setShowTypes(true)}>Item Types</button>}
           <button className="new-order-btn" onClick={openNew}>New Item</button>
         </div>
       </header>

@@ -231,13 +231,18 @@ Items registered in the admin (Items page) are published through two public, rea
 
 CORS is open (`*`) and responses are cached for 60 seconds.
 
-## Roles (RBAC)
+## Users and roles
 
-Two roles, each with its own password (environment variables in Vercel; redeploy after changing them):
+Everyone signs in with a **username and password**. Accounts are managed by the super admin in **Settings → Users** (add, edit, change role, reset password, delete). Everyone can change their own password from the sidebar.
 
-| Role | Password variable | Access |
-|---|---|---|
-| Super admin | `ADMIN_PASSWORD` | Everything |
-| Japan admin | `JAPAN_ADMIN_PASSWORD` | So Chic Board, Orders, Quotation, QR Code Generator, limited to **Japan** records (orders/quotations/tickets whose country or order place is Japan) and the QR codes she created. No Dashboard, Items, Expenses or Settings; cannot read or save the item catalog, expenses or settings (reading exchange rates is allowed so quotations can convert). |
+| Role | Access |
+|---|---|
+| Super admin | Everything, all countries, Settings and users |
+| Thai admin | Dashboard, So Chic Board, Orders, Quotation, Items (Thailand) and QR codes, limited to **Thailand** records |
+| Japan admin | The same pages for **Japan** records and Items (Japan) |
 
-The role is stored in the signed session cookie and enforced in the API (`lib/auth.js`, `lib/routes/*`), not just hidden in the menu. Japan admin writes are forced to Japan, and records outside Japan return 404 for her.
+The role is enforced in the API (`lib/auth.js`, `lib/routes/*`), not just hidden in the menu. Records outside a Thai/Japan admin's country return nothing / 404 for them, and what they create is forced to their country.
+
+- **First run:** when the users table is first created it gets two accounts from the old Vercel passwords: `mikimyatnoe` (super admin, password = `ADMIN_PASSWORD`) and `aeindraaung` (Japan admin, password = `JAPAN_ADMIN_PASSWORD`). After that, passwords are managed in the app and `JAPAN_ADMIN_PASSWORD` is no longer used.
+- **Emergency login:** `ADMIN_PASSWORD` still signs in as a super admin with any username, so a forgotten password or a mistake can never lock everyone out. Keep it secret.
+- Passwords are stored as salted scrypt hashes. A deleted user or a changed role takes effect within about 30 seconds. The last super admin can't be deleted or demoted, and nobody can delete or re-role themselves.

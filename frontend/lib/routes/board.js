@@ -1,20 +1,21 @@
 // So Chic Board: orders as tickets in To do / In progress / Done / Closed, with comments.
 const { requireAuth } = require('../auth');
 const { pool, ensureSchema } = require('../db');
+const { scopeOf } = require('../auth');
 
 const STAGES = ['todo', 'in_progress', 'done', 'closed'];
 
 module.exports = async (req, res, [first, second]) => {
-  const session = requireAuth(req, res);
+  const session = await requireAuth(req, res);
   if (!session) return;
-  const japan = session.role === 'japan';
+  const scope = scopeOf(session); // 'japan' | 'thailand' | null (super admin)
   await ensureSchema();
 
-  // The Japan admin only sees and touches Japan tickets.
+  // A Japan or Thai admin only sees and touches their own country's tickets.
   const canTouch = async (orderId) => {
     const r = await pool.query(
-      `SELECT 1 FROM orders WHERE id = $1 AND ($2::boolean = false OR lower(btrim(country)) = 'japan')`,
-      [orderId, japan]
+      `SELECT 1 FROM orders WHERE id = $1 AND ($2::text IS NULL OR lower(btrim(country)) = $2)`,
+      [orderId, scope]
     );
     return r.rowCount > 0;
   };
@@ -29,7 +30,7 @@ module.exports = async (req, res, [first, second]) => {
               o.board_stage, o.board_position, o.board_checks,
               (SELECT COUNT(*)::int FROM board_comments c WHERE c.order_id = o.id) AS comment_count
        FROM orders o
-       ${japan ? "WHERE lower(btrim(o.country)) = 'japan'" : ''}
+       ${scope ? `WHERE lower(btrim(o.country)) = '${scope}'` : ''}
        ORDER BY o.board_position`
     );
     return res.status(200).json(
@@ -44,8 +45,8 @@ module.exports = async (req, res, [first, second]) => {
     const pos = Number.isFinite(Number(position)) ? Number(position) : Date.now();
     const result = await pool.query(
       `UPDATE orders SET board_stage = $1, board_position = $2, updated_at = NOW()
-       WHERE id = $3 AND ($4::boolean = false OR lower(btrim(country)) = 'japan') RETURNING id`,
-      [stage, pos, orderId, japan]
+       WHERE id = $3 AND ($4::text IS NULL OR lower(btrim(country)) = $4) RETURNING id`,
+      [stage, pos, orderId, scope]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
     return res.status(200).json({ id: orderId, stage, position: pos });
@@ -96,8 +97,8 @@ module.exports = async (req, res, [first, second]) => {
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     await pool.query(
       `DELETE FROM board_comments c USING orders o
-       WHERE c.id = $1 AND o.id = c.order_id AND ($2::boolean = false OR lower(btrim(o.country)) = 'japan')`,
-      [second, japan]
+       WHERE c.id = $1 AND o.id = c.order_id AND ($2::text IS NULL OR lower(btrim(o.country)) = $2)`,
+      [second, scope]
     );
     return res.status(200).json({ deleted: true });
   }

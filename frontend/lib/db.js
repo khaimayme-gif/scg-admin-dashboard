@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { hashPassword } = require('./passwords');
 
 function cleanConnectionString(raw) {
   if (!raw) return raw;
@@ -25,6 +26,25 @@ const pool = new Pool({
 });
 
 let schemaReady = null;
+
+// The first time the users table exists it is empty. Create the two accounts that were already
+// signing in with the Vercel passwords, keeping those passwords, so nobody is locked out. After
+// that the accounts are managed in Settings and the passwords here are no longer used for them.
+async function seedFirstUsers() {
+  const existing = await pool.query('SELECT 1 FROM users LIMIT 1');
+  if (existing.rowCount > 0) return;
+  const seeds = [
+    ['mikimyatnoe', 'superadmin', process.env.ADMIN_PASSWORD],
+    ['aeindraaung', 'japan', process.env.JAPAN_ADMIN_PASSWORD],
+  ];
+  for (const [username, role, password] of seeds) {
+    if (!password) continue;
+    await pool.query(
+      'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING',
+      [username, await hashPassword(password), role]
+    );
+  }
+}
 
 function ensureSchema() {
   if (!schemaReady) {
@@ -286,6 +306,17 @@ function ensureSchema() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )`))
+    // User accounts. Roles: superadmin, thai, japan.
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`))
+    .then(seedFirstUsers)
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,

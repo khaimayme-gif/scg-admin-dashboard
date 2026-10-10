@@ -3,7 +3,7 @@ const { pool, ensureSchema } = require('../db');
 
 module.exports = async (req, res, [first]) => {
   if (!first && req.method === 'GET') {
-    if (!requireAuth(req, res)) return;
+    if (!await requireAuth(req, res)) return;
     await ensureSchema();
     const result = await pool.query('SELECT * FROM settings WHERE id = 1');
     const row = result.rows[0] || {};
@@ -15,7 +15,7 @@ module.exports = async (req, res, [first]) => {
   }
 
   if (first === 'save' && req.method === 'POST') {
-    if (!requireSuper(req, res)) return;
+    if (!await requireSuper(req, res)) return;
     await ensureSchema();
     const { rateThbToJpy, rateThbToMmk, rateMmkToJpy } = req.body || {};
     await pool.query(

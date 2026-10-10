@@ -1,12 +1,14 @@
 const { requireAuth } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 const { platformFeeJpy } = require('../platform-fee');
+const { scopeOf } = require('../auth');
 
 // Payment status. 'cancelled' only survives on orders cancelled before the board existed.
 const STATUSES = ['pending', 'partially_paid', 'paid', 'cancelled'];
 const CURRENCIES = ['THB', 'JPY', 'MMK'];
-// SQL condition for "this is a Japan order", used to fence in the Japan admin.
-const JAPAN_ONLY = "lower(btrim(country)) = 'japan'";
+// SQL condition fencing a Japan or Thai admin in to their own country's orders. `scope` is only ever
+// 'japan' or 'thailand' (from the role), never user input.
+const countryOnly = (scope) => `lower(btrim(country)) = '${scope}'`;
 const CHANNELS = ['tiktok', 'facebook'];
 
 const ORDER_COLUMNS = `id, order_no, quotation_id, customer_name, country, channel,
@@ -54,14 +56,15 @@ function toJpy(amount, currency, rates) {
 }
 
 module.exports = async (req, res, [first, second]) => {
-  const session = requireAuth(req, res);
+  const session = await requireAuth(req, res);
   if (!session) return;
-  const japan = session.role === 'japan';
+  const scope = scopeOf(session); // 'japan' | 'thailand' | null (super admin)
+  const scopeLabel = scope === 'japan' ? 'Japan' : scope === 'thailand' ? 'Thailand' : null;
   await ensureSchema();
 
   if (!first && req.method === 'GET') {
     const result = await pool.query(
-      `SELECT ${ORDER_COLUMNS} FROM orders ${japan ? `WHERE ${JAPAN_ONLY}` : ''} ORDER BY order_date DESC, id DESC`
+      `SELECT ${ORDER_COLUMNS} FROM orders ${scope ? `WHERE ${countryOnly(scope)}` : ''} ORDER BY order_date DESC, id DESC`
     );
     return res.status(200).json(result.rows.map(parse));
   }
@@ -71,7 +74,7 @@ module.exports = async (req, res, [first, second]) => {
       pool.query(
         `SELECT status, currency, selling_price, cost, revenue, platform_fee_jpy,
                 to_char(order_date, 'YYYY-MM') AS month
-         FROM orders ${japan ? `WHERE ${JAPAN_ONLY}` : ''}`
+         FROM orders ${scope ? `WHERE ${countryOnly(scope)}` : ''}`
       ),
       pool.query('SELECT * FROM settings WHERE id = 1'),
     ]);
@@ -147,8 +150,8 @@ module.exports = async (req, res, [first, second]) => {
       id, customerName, country, channel, orderDate, status, currency, sellingPrice, items, notes,
       recipient, recipientPhone, deliveryDate, deliveryAddress, deliveryNote, quotationId,
     } = req.body || {};
-    // The Japan admin can only work with Japan orders: the country is fixed, whatever was sent.
-    const orderCountry = japan ? 'Japan' : country;
+    // A Japan or Thai admin can only work with their own country's orders: the country is fixed, whatever was sent.
+    const orderCountry = scopeLabel ?? country;
     if (!customerName || !orderCountry) {
       return res.status(400).json({ error: 'customerName and country are required' });
     }
@@ -212,9 +215,9 @@ module.exports = async (req, res, [first, second]) => {
            currency = $6, selling_price = $7, cost = $8, revenue = $9, items_json = $10, notes = $11,
            recipient = $12, recipient_phone = $13, delivery_date = $14, delivery_address = $15, delivery_note = $16,
            platform_fee_jpy = $19, updated_at = NOW()
-         WHERE id = $17 AND ($18::boolean = false OR ${JAPAN_ONLY})
+         WHERE id = $17 AND ($18::text IS NULL OR lower(btrim(country)) = $18)
          RETURNING ${ORDER_COLUMNS}`,
-        [...values, id, japan, feeJpy]
+        [...values, id, scope, feeJpy]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
       return res.status(200).json(parse(result.rows[0]));
@@ -228,9 +231,9 @@ module.exports = async (req, res, [first, second]) => {
       }
     }
 
-    if (japan && linkedQuotation !== null) {
+    if (scope && linkedQuotation !== null) {
       const q = await pool.query(
-        `SELECT 1 FROM quotations WHERE id = $1 AND lower(btrim(order_place)) = 'japan'`, [linkedQuotation]
+        `SELECT 1 FROM quotations WHERE id = $1 AND lower(btrim(order_place)) = $2`, [linkedQuotation, scope]
       );
       if (q.rowCount === 0) return res.status(404).json({ error: 'Quotation not found' });
     }
@@ -275,7 +278,7 @@ module.exports = async (req, res, [first, second]) => {
   if (first === 'delete' && second && req.method === 'DELETE') {
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     const result = await pool.query(
-      `DELETE FROM orders WHERE id = $1 AND ($2::boolean = false OR ${JAPAN_ONLY})`, [second, japan]
+      `DELETE FROM orders WHERE id = $1 AND ($2::text IS NULL OR lower(btrim(country)) = $2)`, [second, scope]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Order not found' });
     return res.status(200).json({ deleted: true });

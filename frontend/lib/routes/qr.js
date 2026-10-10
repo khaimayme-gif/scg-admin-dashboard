@@ -3,7 +3,7 @@ const { pool, ensureSchema } = require('../db');
 
 module.exports = async (req, res, [first, second]) => {
   if (first === 'save' && req.method === 'POST') {
-    const session = requireAuth(req, res);
+    const session = await requireAuth(req, res);
     if (!session) return;
     await ensureSchema();
     const { url, label, cardTheme, dotColor, showHandle } = req.body || {};
@@ -17,25 +17,25 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'history' && !second && req.method === 'GET') {
-    const session = requireAuth(req, res);
+    const session = await requireAuth(req, res);
     if (!session) return;
     await ensureSchema();
-    // The Japan admin only sees the QR codes she made herself.
+    // Japan and Thai admins only see the QR codes made by their own role.
     const result = await pool.query(
       `SELECT * FROM qr_codes WHERE ($1::text IS NULL OR created_by = $1) ORDER BY created_at DESC`,
-      [session.role === 'japan' ? 'japan' : null]
+      [session.role === 'superadmin' ? null : session.role]
     );
     return res.status(200).json(result.rows);
   }
 
   if (first === 'history' && second && req.method === 'DELETE') {
-    const session = requireAuth(req, res);
+    const session = await requireAuth(req, res);
     if (!session) return;
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     await ensureSchema();
     await pool.query(
       `DELETE FROM qr_codes WHERE id = $1 AND ($2::text IS NULL OR created_by = $2)`,
-      [second, session.role === 'japan' ? 'japan' : null]
+      [second, session.role === 'superadmin' ? null : session.role]
     );
     return res.status(200).json({ deleted: true });
   }

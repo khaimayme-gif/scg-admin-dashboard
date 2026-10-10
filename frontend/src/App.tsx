@@ -12,7 +12,7 @@ import type { OrderIntent, QuotationForOrder } from './Orders';
 import ExpenseTracker from './ExpenseTracker';
 import Templates from './Templates';
 import Dashboard from './Dashboard';
-import { RoleContext, ROLE_PAGES, ROLE_HOME } from './role';
+import { RoleContext, ROLE_PAGES, ROLE_HOME, isRole } from './role';
 import type { Role } from './role';
 import SochicBoard from './SochicBoard';
 
@@ -23,6 +23,8 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [role, setRole] = useState<Role>('superadmin');
+  const [username, setUsername] = useState('');
+  const [canChangePassword, setCanChangePassword] = useState(true);
   // "Make Order" on a quotation hands it to the Orders page, which opens the prefilled form.
   const [menuOpen, setMenuOpen] = useState(false);
   const [orderIntent, setOrderIntent] = useState<OrderIntent | null>(null);
@@ -47,9 +49,11 @@ export default function App() {
       .then((res) => res.json())
       .then((data) => {
         setAuthenticated(!!data.authenticated);
-        if (data.role === 'japan') {
-          setRole('japan');
-          setActive(ROLE_HOME.japan);
+        if (isRole(data.role)) {
+          setRole(data.role);
+          setActive(ROLE_HOME[data.role as Role]);
+          setUsername(String(data.username ?? ''));
+          setCanChangePassword(data.canChangePassword !== false);
         }
       })
       .catch(() => setAuthenticated(false))
@@ -67,6 +71,7 @@ export default function App() {
     await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
     setAuthenticated(false);
     setRole('superadmin');
+    setUsername('');
     setActive(ROLE_HOME.superadmin);
   };
 
@@ -77,8 +82,10 @@ export default function App() {
   if (!authenticated) {
     return (
       <Login
-        onSuccess={(r) => {
+        onSuccess={(r, name) => {
           setRole(r);
+          setUsername(name);
+          setCanChangePassword(name !== 'emergency login');
           setActive(ROLE_HOME[r]);
           setAuthenticated(true);
         }}
@@ -105,7 +112,7 @@ export default function App() {
         </button>
         <span className="mobile-topbar-title">So Chic Gifts</span>
       </header>
-      <Sidebar active={page} role={role} onSelect={handleSelect} onLogout={handleLogout} open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <Sidebar active={page} role={role} username={username} canChangePassword={canChangePassword} onSelect={handleSelect} onLogout={handleLogout} open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main className="app-content">
         {page === 'dashboard' && <Dashboard onOpenOrder={handleOpenOrder} />}
         {page === 'board' && (

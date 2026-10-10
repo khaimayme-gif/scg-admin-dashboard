@@ -1,5 +1,6 @@
 const { requireAuth } = require('../auth');
 const { pool, ensureSchema } = require('../db');
+const { scopeOf } = require('../auth');
 const { platformFeeJpy } = require('../platform-fee');
 
 const CHANNELS = ['tiktok', 'facebook'];
@@ -28,9 +29,10 @@ const nextQuoteNo = async (client) => {
 };
 
 module.exports = async (req, res, [first, second]) => {
-  const session = requireAuth(req, res);
+  const session = await requireAuth(req, res);
   if (!session) return;
-  const japan = session.role === 'japan';
+  const scope = scopeOf(session); // 'japan' | 'thailand' | null (super admin)
+  const scopeLabel = scope === 'japan' ? 'Japan' : scope === 'thailand' ? 'Thailand' : null;
   await ensureSchema();
 
   if (!first && req.method === 'GET') {
@@ -41,7 +43,7 @@ module.exports = async (req, res, [first, second]) => {
               o.id AS order_id, o.order_no
        FROM quotations q
        LEFT JOIN orders o ON o.quotation_id = q.id
-       ${japan ? "WHERE lower(btrim(q.order_place)) = 'japan'" : ''}
+       ${scope ? `WHERE lower(btrim(q.order_place)) = '${scope}'` : ''}
        ORDER BY q.created_at DESC, q.id DESC`
     );
     return res.status(200).json(result.rows.map(parse));
@@ -50,8 +52,8 @@ module.exports = async (req, res, [first, second]) => {
   if (first === 'save' && req.method === 'POST') {
     const { customerName, channel, quoteDate, items } = req.body || {};
     const payCurrency = (req.body || {}).payCurrency || 'THB';
-    // The Japan admin can only quote for Japan, whatever was sent.
-    const orderPlace = japan ? 'Japan' : (req.body || {}).orderPlace;
+    // A Japan or Thai admin can only quote for their own country, whatever was sent.
+    const orderPlace = scopeLabel ?? (req.body || {}).orderPlace;
     if (!customerName || !customerName.trim()) {
       return res.status(400).json({ error: 'customerName is required' });
     }
@@ -155,8 +157,8 @@ module.exports = async (req, res, [first, second]) => {
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'id must be a number' });
     if (!PAY_CURRENCIES.includes(payCurrency)) return res.status(400).json({ error: 'Invalid customer currency' });
     const found = await pool.query(
-      `SELECT * FROM quotations WHERE id = $1 AND ($2::boolean = false OR lower(btrim(order_place)) = 'japan')`,
-      [id, japan]
+      `SELECT * FROM quotations WHERE id = $1 AND ($2::text IS NULL OR lower(btrim(order_place)) = $2)`,
+      [id, scope]
     );
     if (found.rowCount === 0) return res.status(404).json({ error: 'Quotation not found' });
     const q = found.rows[0];
@@ -183,8 +185,8 @@ module.exports = async (req, res, [first, second]) => {
   if (first === 'delete' && second && req.method === 'DELETE') {
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     const result = await pool.query(
-      `DELETE FROM quotations WHERE id = $1 AND ($2::boolean = false OR lower(btrim(order_place)) = 'japan')`,
-      [second, japan]
+      `DELETE FROM quotations WHERE id = $1 AND ($2::text IS NULL OR lower(btrim(order_place)) = $2)`,
+      [second, scope]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Quotation not found' });
     return res.status(200).json({ deleted: true });

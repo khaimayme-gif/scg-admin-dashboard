@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from './api';
-import { useRole } from './role';
+import { useRole, lockedCountryOf } from './role';
 
 interface OrderItem {
   name: string;
@@ -120,11 +120,13 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onOpenOrder }: DashboardProps) {
-  const isJapanRole = useRole() === 'japan';
+  // Thai and Japan admins only get their own country's numbers (the server enforces it too).
+  const lockedCountry = lockedCountryOf(useRole());
+  const isLocked = lockedCountry !== null;
   const [orders, setOrders] = useState<Order[]>([]);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<View>(isJapanRole ? 'japan' : 'all');
+  const [view, setView] = useState<View>(lockedCountry ? (lockedCountry.toLowerCase() as View) : 'all');
   const [months, setMonths] = useState<6 | 12>(6);
   const thisMonth = todayLocal().slice(0, 7);
   const [month, setMonth] = useState(thisMonth);
@@ -206,7 +208,7 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
   const maxValue = Math.max(1, ...series.map((s) => s.value));
   const total = series.reduce((sum, s) => sum + s.value, 0);
 
-  const chartTitle = view === 'all' ? 'SochicGifts profit by month' : view === 'japan' ? (isJapanRole ? 'Your profit by month' : 'Japan admin profit by month') : 'Profit by month';
+  const chartTitle = view === 'all' ? 'SochicGifts profit by month' : view === 'japan' ? (isLocked ? 'Your profit by month' : 'Japan admin profit by month') : isLocked ? 'Your profit by month' : 'Profit by month';
   const chartNote =
     view === 'all'
       ? 'Profit = revenue on Thailand orders + SochicGifts platform fees on Japan orders, in THB at the Settings rates, before expenses.'
@@ -253,7 +255,7 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
       <header className="page-header">
         <h1>Dashboard</h1>
         <p className="page-subtitle">
-          {isJapanRole ? 'How your Japan orders are doing, and what needs to go out next.' : 'How So Chic Gifts is doing, and what needs to go out next.'}
+          {lockedCountry ? `How your ${lockedCountry} orders are doing, and what needs to go out next.` : 'How So Chic Gifts is doing, and what needs to go out next.'}
         </p>
       </header>
 
@@ -262,7 +264,7 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
       ) : (
         <>
           <div className="dash-filters">
-            {!isJapanRole && (
+            {!isLocked && (
               <div className="view-toggle" role="tablist" aria-label="Country">
                 {(['all', 'thailand', 'japan'] as View[]).map((v) => (
                   <button key={v} role="tab" aria-selected={view === v}
@@ -307,7 +309,7 @@ export default function Dashboard({ onOpenOrder }: DashboardProps) {
                 {card('Orders', String(cur.orders), monthLong(month))}
                 {card('Collected', money(cur.selling), 'Selling price total')}
                 {card('Cost', money(cur.cost))}
-                {card(isJapanRole ? 'Your profit' : 'Japan admin profit', money(cur.revenue), `${deltaText}, selling price minus cost`, cur.revenue < 0)}
+                {card(isLocked ? 'Your profit' : 'Japan admin profit', money(cur.revenue), `${deltaText}, selling price minus cost`, cur.revenue < 0)}
                 {card('SochicGifts platform fees', money(cur.fee), 'All platform fees from Japan orders')}
                 {deliverCard}
               </>

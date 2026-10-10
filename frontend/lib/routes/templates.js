@@ -66,14 +66,14 @@ function clean(body) {
 
 module.exports = async (req, res, [first, second]) => {
   if (!first && req.method === 'GET') {
-    if (!requireSuper(req, res)) return;
+    if (!await requireSuper(req, res)) return;
     await ensureSchema();
     const result = await pool.query(`SELECT ${COLUMNS} FROM templates ORDER BY sort_order, id`);
     return res.status(200).json(result.rows);
   }
 
   if (first === 'save' && req.method === 'POST') {
-    if (!requireSuper(req, res)) return;
+    if (!await requireSuper(req, res)) return;
     await ensureSchema();
     const { id } = req.body || {};
     const { error, values } = clean(req.body);
@@ -103,7 +103,7 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'delete' && second && req.method === 'DELETE') {
-    if (!requireSuper(req, res)) return;
+    if (!await requireSuper(req, res)) return;
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     await ensureSchema();
     const result = await pool.query('DELETE FROM templates WHERE id = $1 RETURNING video_url', [second]);
@@ -112,7 +112,7 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'reorder' && req.method === 'POST') {
-    if (!requireSuper(req, res)) return;
+    if (!await requireSuper(req, res)) return;
     const ids = (req.body || {}).ids;
     if (!Array.isArray(ids) || !ids.every((n) => Number.isInteger(n))) {
       return res.status(400).json({ error: 'ids must be a list of template ids' });
@@ -129,7 +129,7 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'upload-url' && req.method === 'POST') {
-    if (!requireSuper(req, res)) return;
+    if (!await requireSuper(req, res)) return;
     if (!SUPABASE_URL || !SUPABASE_KEY) {
       return res.status(503).json({ error: 'Video uploads are not set up yet: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are missing in Vercel' });
     }
@@ -152,7 +152,7 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'import' && req.method === 'POST') {
-    if (!requireSuper(req, res)) return;
+    if (!await requireSuper(req, res)) return;
     await ensureSchema();
     const client = await pool.connect();
     try {
