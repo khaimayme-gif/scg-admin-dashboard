@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiFetch, jsonBody } from './api';
 import logo from './assets/sochic-logo-pink.png';
 import { ROLE_PAGES, ROLE_LABELS } from './role';
 import type { Role } from './role';
@@ -10,6 +11,8 @@ interface SidebarProps {
   open: boolean;
   onClose: () => void;
   role: Role;
+  username: string;
+  canChangePassword: boolean;
 }
 
 interface Module {
@@ -39,7 +42,76 @@ const MODULES: Module[] = [
   { id: 'settings', label: 'Settings', ready: true },
 ];
 
-export default function Sidebar({ active, onSelect, onLogout, open, onClose, role }: SidebarProps) {
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [again, setAgain] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const save = async () => {
+    if (next !== again) {
+      setError('The two new passwords are not the same.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await apiFetch('/users/password', jsonBody({ currentPassword: current, newPassword: next }));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Could not change the password.');
+        return;
+      }
+      setDone(true);
+    } catch {
+      // a 401 has already sent us back to login
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-card types-card">
+        <div className="modal-header">
+          <h2 className="panel-label">Change my password</h2>
+          <button className="item-remove" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        {done ? (
+          <>
+            <p className="order-profit">Your password was changed.</p>
+            <div className="order-form-actions"><button className="save-btn" onClick={onClose}>Done</button></div>
+          </>
+        ) : (
+          <>
+            <div className="order-field" style={{ marginBottom: 12 }}>
+              <label>Current password</label>
+              <input type="password" className="item-input" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" autoFocus />
+            </div>
+            <div className="order-field" style={{ marginBottom: 12 }}>
+              <label>New password (at least 8 characters)</label>
+              <input type="password" className="item-input" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" />
+            </div>
+            <div className="order-field" style={{ marginBottom: 12 }}>
+              <label>New password again</label>
+              <input type="password" className="item-input" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" />
+            </div>
+            {error && <p className="error-text">{error}</p>}
+            <div className="order-form-actions">
+              <button className="save-btn" onClick={save} disabled={saving || !current || !next}>{saving ? 'Saving…' : 'Change password'}</button>
+              <button className="add-item-btn" onClick={onClose} disabled={saving}>Cancel</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function Sidebar({ active, onSelect, onLogout, open, onClose, role, username, canChangePassword }: SidebarProps) {
+  const [showPassword, setShowPassword] = useState(false);
   // A group starts open when the page you are on is inside it, and you can open/close it yourself.
   const [openGroups, setOpenGroups] = useState<Set<string>>(
     () => new Set(MODULES.filter((m) => m.children?.some((c) => c.id === active)).map((m) => m.id))
@@ -110,9 +182,16 @@ export default function Sidebar({ active, onSelect, onLogout, open, onClose, rol
           );
         })}
       </ul>
+      <div className="sidebar-account">
+        {username && <span className="sidebar-user">Signed in as <strong>{username}</strong></span>}
+        {canChangePassword && (
+          <button className="sidebar-link" onClick={() => setShowPassword(true)}>Change password</button>
+        )}
+      </div>
       <button className="sidebar-logout" onClick={onLogout}>
         Log out
       </button>
+      {showPassword && <ChangePasswordModal onClose={() => setShowPassword(false)} />}
     </nav>
     </>
   );

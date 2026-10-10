@@ -1,11 +1,11 @@
 const crypto = require('crypto');
 require('dotenv').config({path: "./.env.local"});
 
-// Two roles, each with its own password (environment variables):
-//   superadmin: ADMIN_PASSWORD, sees everything.
-//   japan:      JAPAN_ADMIN_PASSWORD, only Japan orders, quotations and tickets, plus her own QR codes.
+// Users sign in with a username and password (accounts live in the users table, managed in
+// Settings). ADMIN_PASSWORD stays as an emergency super admin login, so a forgotten password or a
+// mistake with the last super admin can never lock everyone out.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const JAPAN_ADMIN_PASSWORD = process.env.JAPAN_ADMIN_PASSWORD;
+const ROLES = ['superadmin', 'thai', 'japan'];
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -30,31 +30,26 @@ function sign(value) {
   return `${value}.${hmac}`;
 }
 
-// Returns the role the password belongs to, or null. Both comparisons always run so the time
-// taken doesn't hint at which password was close. If both passwords were ever set to the same
-// value, superadmin wins.
-function verifyPassword(password) {
-  const isSuper = Boolean(ADMIN_PASSWORD) && constantTimeEqual(password, ADMIN_PASSWORD);
-  const isJapan = Boolean(JAPAN_ADMIN_PASSWORD) && constantTimeEqual(password, JAPAN_ADMIN_PASSWORD);
-  if (isSuper) return 'superadmin';
-  if (isJapan) return 'japan';
-  return null;
+// Emergency login: the old super admin password from Vercel, with any username.
+function isEmergencyPassword(password) {
+  return Boolean(ADMIN_PASSWORD) && constantTimeEqual(password, ADMIN_PASSWORD);
 }
 
-// Session tokens are `<expiry>|<role>.<hmac>`. Tokens issued before roles existed were just
-// `<expiry>.<hmac>` and only ever came from the single admin password, so they count as superadmin.
-// Returns { role } for a valid, unexpired token, otherwise null.
+// Session tokens are `<expiry>|<role>|<user id>.<hmac>`; the emergency login uses id "e".
+// Tokens from before accounts existed have no user id and are no longer accepted: everyone signs
+// in once with their username. Returns { role, userId } from the token alone, or null.
 function verifySignedToken(token) {
   if (!SESSION_CONFIGURED || !token) return null;
   const lastDot = token.lastIndexOf('.');
   if (lastDot === -1) return null;
   const value = token.slice(0, lastDot);
   if (!constantTimeEqual(sign(value), token)) return null;
-  const [expiry, role = 'superadmin'] = value.split('|');
+  const [expiry, role, uid] = value.split('|');
   const expiresAt = Number(expiry);
   if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) return null;
-  if (role !== 'superadmin' && role !== 'japan') return null;
-  return { role };
+  if (!ROLES.includes(role) || !uid) return null;
+  if (uid === 'e') return role === 'superadmin' ? { role, userId: null } : null;
+  return /^\d+$/.test(uid) ? { role, userId: Number(uid) } : null;
 }
 
 function parseCookies(req) {
@@ -68,9 +63,9 @@ function parseCookies(req) {
   );
 }
 
-function createSessionCookie(role) {
+function createSessionCookie(role, userId) {
   const expiresAt = Date.now() + SESSION_MAX_AGE_MS;
-  const token = sign(`${expiresAt}|${role}`);
+  const token = sign(`${expiresAt}|${role}|${userId === null || userId === undefined ? 'e' : userId}`);
   return `scg_session=${encodeURIComponent(token)}; HttpOnly; Secure; Max-Age=${SESSION_MAX_AGE_MS / 1000}; SameSite=Lax; Path=/`;
 }
 
@@ -78,21 +73,51 @@ function clearSessionCookie() {
   return 'scg_session=; HttpOnly; Secure; Max-Age=0; SameSite=Lax; Path=/';
 }
 
-function getSession(req) {
-  return verifySignedToken(parseCookies(req).scg_session);
+// The role in the cookie is only a hint: the account is looked up (cached for 30 seconds) so a
+// deleted user or a changed role takes effect almost immediately instead of when the cookie expires.
+const USER_CACHE_MS = 30 * 1000;
+const userCache = new Map(); // id -> { user: { id, username, role } | null, at }
+
+function forgetUser(id) {
+  userCache.delete(Number(id));
 }
 
-// Any signed-in user. Returns the session ({ role }) or null after sending a 401.
-function requireAuth(req, res) {
-  const session = getSession(req);
+async function lookupUser(id) {
+  const hit = userCache.get(id);
+  if (hit && Date.now() - hit.at < USER_CACHE_MS) return hit.user;
+  const { pool, ensureSchema } = require('./db');
+  await ensureSchema();
+  const result = await pool.query('SELECT id, username, role FROM users WHERE id = $1', [id]);
+  const user = result.rows[0] || null;
+  userCache.set(id, { user, at: Date.now() });
+  return user;
+}
+
+// Returns { role, userId, username } for a signed-in user, otherwise null.
+async function getSession(req) {
+  const token = verifySignedToken(parseCookies(req).scg_session);
+  if (!token) return null;
+  if (token.userId === null) return { role: 'superadmin', userId: null, username: 'emergency login' };
+  const user = await lookupUser(token.userId);
+  return user ? { role: user.role, userId: user.id, username: user.username } : null;
+}
+
+// Which country's data a role is held to: 'japan', 'thailand', or null (no limit, the super admin).
+function scopeOf(session) {
+  return session.role === 'japan' ? 'japan' : session.role === 'thai' ? 'thailand' : null;
+}
+
+// Any signed-in user. Returns the session or null after sending a 401.
+async function requireAuth(req, res) {
+  const session = await getSession(req);
   if (session) return session;
   res.status(401).json({ error: 'Not authenticated' });
   return null;
 }
 
 // Superadmin only. Returns the session or null after sending a 401 / 403.
-function requireSuper(req, res) {
-  const session = requireAuth(req, res);
+async function requireSuper(req, res) {
+  const session = await requireAuth(req, res);
   if (!session) return null;
   if (session.role === 'superadmin') return session;
   res.status(403).json({ error: 'You do not have access to this' });
@@ -101,12 +126,15 @@ function requireSuper(req, res) {
 
 module.exports = {
   SESSION_CONFIGURED,
-  verifyPassword,
+  ROLES,
+  isEmergencyPassword,
   parseCookies,
   verifySignedToken,
   getSession,
+  scopeOf,
+  forgetUser,
+  requireAuth,
   requireSuper,
   createSessionCookie,
   clearSessionCookie,
-  requireAuth,
 };

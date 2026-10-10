@@ -1,14 +1,16 @@
 import { useState } from 'react';
+import { isRole } from './role';
 import type { Role } from './role';
 import logo from './assets/sochic-logo-pink.png';
 
 const API_BASE = '/api';
 
 interface LoginProps {
-  onSuccess: (role: Role) => void;
+  onSuccess: (role: Role, username: string) => void;
 }
 
 export default function Login({ onSuccess }: LoginProps) {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting'>('idle');
@@ -22,12 +24,12 @@ export default function Login({ onSuccess }: LoginProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       });
       if (!res.ok) {
         // The server explains rate limiting and misconfiguration in its error body; fall
         // back to the generic message if there isn't one.
-        let message = 'Incorrect password.';
+        let message = 'Incorrect username or password.';
         try {
           const data = await res.json();
           if (data?.error) message = data.error;
@@ -39,7 +41,7 @@ export default function Login({ onSuccess }: LoginProps) {
         return;
       }
       const data = await res.json().catch(() => ({}));
-      onSuccess(data.role === 'japan' ? 'japan' : 'superadmin');
+      onSuccess(isRole(data.role) ? data.role : 'superadmin', String(data.username ?? username));
     } catch {
       setErrorMsg('Could not reach the server. Check your connection and try again.');
       setStatus('idle');
@@ -52,15 +54,25 @@ export default function Login({ onSuccess }: LoginProps) {
         <img className="login-logo" src={logo} alt="So Chic Gifts" />
         <div className="login-brand">So Chic Gifts</div>
         <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          className="item-input"
+          autoComplete="username"
+          autoCapitalize="none"
+          autoFocus
+        />
+        <input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="item-input"
-          autoFocus
+          autoComplete="current-password"
         />
         <button type="submit" className="calculate-btn" disabled={status === 'submitting'}>
-          {status === 'submitting' ? 'Checking…' : 'Unlock'}
+          {status === 'submitting' ? 'Checking…' : 'Sign in'}
         </button>
         {errorMsg && <p className="error-text">{errorMsg}</p>}
       </form>

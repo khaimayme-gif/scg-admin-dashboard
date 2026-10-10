@@ -7,7 +7,7 @@
 //
 // Cancelled orders are left out. Country is matched case/space-insensitively; anything that is
 // not Thailand or Japan is grouped as "other".
-const { requireAuth } = require('../auth');
+const { requireAuth, scopeOf } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 
 function toThb(amount, currency, rates) {
@@ -23,10 +23,11 @@ const countryKey = (country) => {
 };
 
 module.exports = async (req, res, [first]) => {
-  const session = requireAuth(req, res);
+  const session = await requireAuth(req, res);
   if (!session) return;
   if (first || req.method !== 'GET') return res.status(404).json({ error: 'Not found' });
-  const japanOnly = session.role === 'japan';
+  const scope = scopeOf(session); // 'japan' | 'thailand' | null (super admin)
+  const japanOnly = scope !== null; // restricted to one country (name kept from when only Japan was)
   await ensureSchema();
 
   const [ordersResult, settingsResult] = await Promise.all([
@@ -34,7 +35,7 @@ module.exports = async (req, res, [first]) => {
       `SELECT status, country, currency, selling_price, cost, revenue, platform_fee_jpy,
               to_char(order_date, 'YYYY-MM') AS month
        FROM orders
-       ${japanOnly ? "WHERE lower(btrim(country)) = 'japan'" : ''}`
+       ${scope ? `WHERE lower(btrim(country)) = '${scope}'` : ''}`
     ),
     pool.query('SELECT * FROM settings WHERE id = 1'),
   ]);
@@ -100,5 +101,5 @@ module.exports = async (req, res, [first]) => {
     };
   }
 
-  return res.status(200).json({ rates, countries: out, expenses, unconverted });
+  return res.status(200).json({ rates, countries: out, expenses, unconverted, scope });
 };

@@ -1,4 +1,4 @@
-const { requireAuth } = require('../auth');
+const { requireAuth, scopeOf } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 
 // The list never carries photo_data: it can be hundreds of KB per row. The photo is fetched
@@ -8,13 +8,13 @@ const LIST_COLUMNS = `id, category, name, menu_price, original_cost, item_code, 
 
 const COUNTRIES = ['thailand', 'japan'];
 
-// Which catalog a request works on. The Japan admin is always held to the Japan catalog; the super
-// admin picks one (default Thailand).
+// Which catalog a request works on. A Japan or Thai admin is always held to their own country's
+// catalog; the super admin picks one (default Thailand).
 const countryFor = (session, requested) =>
-  session.role === 'japan' ? 'japan' : COUNTRIES.includes(requested) ? requested : 'thailand';
+  scopeOf(session) || (COUNTRIES.includes(requested) ? requested : 'thailand');
 const countryParam = (req) => new URL(req.url, 'http://localhost').searchParams.get('country');
 // null = no restriction (super admin acting on any item by id).
-const fence = (session) => (session.role === 'japan' ? 'japan' : null);
+const fence = (session) => scopeOf(session);
 
 // Photos arrive as data URLs already shrunk by the browser. Cap the size so a bad client
 // can't fill the database.
@@ -23,7 +23,7 @@ const PHOTO_PATTERN = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)
 
 module.exports = async (req, res, [first, second]) => {
   if (!first && req.method === 'GET') {
-    const session = requireAuth(req, res);
+    const session = await requireAuth(req, res);
     if (!session) return;
     await ensureSchema();
     const result = await pool.query(
@@ -35,7 +35,7 @@ module.exports = async (req, res, [first, second]) => {
 
   // Admin-side photo (works for unpublished items too, unlike /api/public/photo).
   if (first === 'photo' && second && req.method === 'GET') {
-    const session = requireAuth(req, res);
+    const session = await requireAuth(req, res);
     if (!session) return;
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     await ensureSchema();
@@ -53,7 +53,7 @@ module.exports = async (req, res, [first, second]) => {
   // Item IDs are handed out per type in row order (CK01, CK02, ...), continuing after the highest
   // number already used.
   if (first === 'import' && req.method === 'POST') {
-    const session = requireAuth(req, res);
+    const session = await requireAuth(req, res);
     if (!session) return;
     await ensureSchema();
     const country = countryFor(session, (req.body || {}).country);
@@ -127,7 +127,7 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'save' && req.method === 'POST') {
-    const session = requireAuth(req, res);
+    const session = await requireAuth(req, res);
     if (!session) return;
     await ensureSchema();
     const { id, category, name, menuPrice, originalCost, itemCode, description, itemGroup, published, photo } = req.body || {};
@@ -182,7 +182,7 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'delete' && second && req.method === 'DELETE') {
-    const session = requireAuth(req, res);
+    const session = await requireAuth(req, res);
     if (!session) return;
     if (!/^\d+$/.test(second)) return res.status(400).json({ error: 'id must be a number' });
     await ensureSchema();

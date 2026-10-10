@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { apiFetch, jsonBody } from './api';
 import { renderQuotationPng, downloadBlob } from './quotationImage';
 import type { QuotationForOrder } from './Orders';
-import { useRole } from './role';
+import { useRole, lockedCountryOf } from './role';
 import { platformFeeJpy } from './platformFee';
 
 type PriceCurrency = 'THB' | 'JPY';
@@ -80,13 +80,13 @@ interface QuotationProps {
 
 export default function Quotation({ onMakeOrder }: QuotationProps) {
   // The Japan admin can only quote for Japan; the server enforces it too.
-  const isJapan = useRole() === 'japan';
-  const places = isJapan ? ['Japan'] : PLACES;
+  const lockedCountry = lockedCountryOf(useRole()); // 'Japan' | 'Thailand' | null
+  const places = lockedCountry ? [lockedCountry] : PLACES;
   const [customerName, setCustomerName] = useState('');
   const [channel, setChannel] = useState('tiktok');
   const [quoteDate, setQuoteDate] = useState(todayLocal());
-  const [orderPlace, setOrderPlace] = useState('Thailand');
-  const [payCurrency, setPayCurrency] = useState<PayCurrency>(isJapan ? 'JPY' : 'THB');
+  const [orderPlace, setOrderPlace] = useState<string>(lockedCountry ?? 'Thailand');
+  const [payCurrency, setPayCurrency] = useState<PayCurrency>(lockedCountry === 'Japan' ? 'JPY' : 'THB');
   const [items, setItems] = useState<FormItem[]>([emptyItem()]);
 
   const [rates, setRates] = useState<Rates | null>(null);
@@ -143,7 +143,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
   const totalEntry = namedItems.reduce((sum, it) => sum + (Number(it.sellingPrice) || 0), 0);
   const originalEntry = namedItems.reduce((sum, it) => sum + (Number(it.originalPrice) || 0), 0);
   const revenueEntry = totalEntry - originalEntry;
-  const feePlace = isJapan ? 'Japan' : orderPlace;
+  const feePlace = lockedCountry ?? orderPlace;
   // Item prices are typed in yen for Japan and in baht for everywhere else.
   const priceCurrency: PriceCurrency = feePlace === 'Japan' ? 'JPY' : 'THB';
 
@@ -175,7 +175,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
         customerName,
         channel,
         quoteDate,
-        orderPlace: isJapan ? 'Japan' : orderPlace,
+        orderPlace: lockedCountry ?? orderPlace,
         payCurrency,
         items: namedItems.map((it) => ({
           name: it.name.trim(),
@@ -203,8 +203,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
     setCustomerName('');
     setChannel('tiktok');
     setQuoteDate(todayLocal());
-    setOrderPlace(isJapan ? 'Japan' : 'Thailand');
-    setPayCurrency(isJapan ? 'JPY' : 'THB');
+    setOrderPlace(lockedCountry ?? 'Thailand');
+    setPayCurrency(lockedCountry === 'Japan' ? 'JPY' : 'THB');
     setItems([emptyItem()]);
     setError('');
   };
@@ -350,7 +350,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
             </div>
             <div className="order-field">
               <label>Order place</label>
-              <select className="item-input" value={isJapan ? 'Japan' : orderPlace} disabled={isJapan} onChange={(e) => {
+              <select className="item-input" value={lockedCountry ?? orderPlace} disabled={lockedCountry !== null} onChange={(e) => {
                 const place = e.target.value;
                 setOrderPlace(place);
                 setPayCurrency(defaultsFor(place).pay);

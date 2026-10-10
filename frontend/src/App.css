@@ -1197,3 +1197,15 @@ body {
   .tpl-admin-form { flex-direction: column; }
   .tpl-admin-video-lg { width: 140px; }
 }
+
+/* Sidebar account */
+.sidebar-account { margin-top: auto; padding: 0 10px 10px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.sidebar-user strong { color: var(--ink); font-weight: 500; word-break: break-all; }
+.sidebar-link { align-self: flex-start; padding: 0; border: none; background: none; font-family: inherit; font-size: 12px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+.sidebar-link:hover { color: var(--ink); }
+.sidebar-account + .sidebar-logout { margin-top: 0; }
+.users-table .cell-sub { text-transform: none; }
+.role-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; background: var(--blush); color: var(--ink); }
+.role-pill.is-superadmin { background: #FFE4EA; color: #B3283F; }
+.user-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+.users-panel { margin-top: 24px; max-width: 760px; }
