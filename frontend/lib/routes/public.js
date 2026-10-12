@@ -4,16 +4,52 @@
 //   GET /api/public/menu        -> { categories: [{ category, items: [...] }] }
 //   GET /api/public/photo/:id   -> the item's image
 //   GET /api/public/templates   -> { templates: [...] } published digital gift templates, in order
+const crypto = require('crypto');
 const { pool, ensureSchema } = require('../db');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 }
 
 module.exports = async (req, res, [first, second]) => {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
+
+  // A customer sending the survey (no login). POST /api/public/survey
+  //   { name, delivery: perfect|minor|problem, rating: 1-5, feedback?, country?: thailand|japan }
+  if (first === 'survey' && req.method === 'POST') {
+    const body = req.body || {};
+    // Hidden field only bots fill in: pretend it worked and save nothing.
+    if (body.website) return res.status(200).json({ ok: true });
+
+    const name = String(body.name || '').trim();
+    const feedback = String(body.feedback || '').trim();
+    const rating = Number(body.rating);
+    if (!name || name.length > 80) return res.status(400).json({ error: 'name' });
+    if (!['perfect', 'minor', 'problem'].includes(body.delivery)) return res.status(400).json({ error: 'delivery' });
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ error: 'rating' });
+    if (feedback.length > 1000) return res.status(400).json({ error: 'feedback' });
+    const country = body.country === 'thailand' || body.country === 'japan' ? body.country : null;
+
+    await ensureSchema();
+    // At most 5 answers per device (by hashed IP) per hour, so the form can't be used to flood the inbox.
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = (typeof forwarded === 'string' && forwarded.split(',')[0].trim()) || (req.socket && req.socket.remoteAddress) || 'unknown';
+    const ipHash = crypto.createHash('sha256').update(`${process.env.SESSION_SECRET || ''}|${ip}`).digest('hex');
+    const recent = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM survey_responses WHERE ip_hash = $1 AND created_at > $2',
+      [ipHash, new Date(Date.now() - 60 * 60 * 1000)]
+    );
+    if (recent.rows[0].n >= 5) return res.status(429).json({ error: 'too_many' });
+
+    await pool.query(
+      'INSERT INTO survey_responses (name, country, delivery, rating, feedback, ip_hash) VALUES ($1, $2, $3, $4, $5, $6)',
+      [name, country, body.delivery, rating, feedback || null, ipHash]
+    );
+    return res.status(200).json({ ok: true });
+  }
+
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   if (first === 'menu') {
