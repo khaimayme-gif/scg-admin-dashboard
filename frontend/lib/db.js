@@ -306,6 +306,21 @@ function ensureSchema() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )`))
+    // Customer survey answers (public form at /survey, read in the admin under Feedback).
+    // country comes from which link the customer used (?c=thailand / ?c=japan); NULL = not known.
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS survey_responses (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        country TEXT,
+        delivery TEXT NOT NULL,
+        rating INTEGER NOT NULL,
+        feedback TEXT,
+        ip_hash TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`))
+    .then(() => pool.query(`
+      CREATE INDEX IF NOT EXISTS survey_responses_created ON survey_responses (created_at DESC)`))
     // User accounts. Roles: superadmin, thai, japan.
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS users (

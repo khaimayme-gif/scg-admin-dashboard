@@ -12,6 +12,7 @@ import type { OrderIntent, QuotationForOrder } from './Orders';
 import ExpenseTracker from './ExpenseTracker';
 import Templates from './Templates';
 import Dashboard from './Dashboard';
+import Feedback from './Feedback';
 import { RoleContext, ROLE_PAGES, ROLE_HOME, isRole } from './role';
 import type { Role } from './role';
 import SochicBoard from './SochicBoard';
@@ -121,6 +122,7 @@ export default function App() {
             onNewOrder={() => { setOrderIntent({ kind: 'new' }); setActive('orders'); }}
           />
         )}
+        {page === 'feedback' && <Feedback />}
         {page === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {page === 'qr' && <QRCodeGenerator />}
         {page === 'settings' && <Settings />}

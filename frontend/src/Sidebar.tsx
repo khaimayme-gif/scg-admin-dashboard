@@ -27,6 +27,7 @@ const MODULES: Module[] = [
   { id: 'board', label: 'So Chic Board', ready: true },
   { id: 'quotation', label: 'Quotation', ready: true },
   { id: 'orders', label: 'Orders', ready: true },
+  { id: 'feedback', label: 'Customer Feedback', ready: true },
   { id: 'qr', label: 'QR Code Generator', ready: true },
   {
     id: 'items',
