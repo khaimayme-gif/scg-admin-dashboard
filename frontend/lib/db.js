@@ -306,6 +306,33 @@ function ensureSchema() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )`))
+    // QR love notes: a printed card carries the same QR for everyone, which opens a password page.
+    // The password written on the card finds the note, and the note says which customer page to open
+    // and when it is available.
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS qr_notes (
+        id SERIAL PRIMARY KEY,
+        customer_name TEXT NOT NULL,
+        occasion TEXT NOT NULL DEFAULT 'other',
+        password TEXT NOT NULL UNIQUE,
+        destination_url TEXT NOT NULL,
+        country TEXT,
+        order_ref TEXT,
+        note TEXT,
+        available_from TIMESTAMPTZ,
+        available_until TIMESTAMPTZ,
+        opens INTEGER NOT NULL DEFAULT 0,
+        last_opened_at TIMESTAMPTZ,
+        created_by TEXT NOT NULL DEFAULT 'superadmin',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`))
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS qr_note_attempts (
+        id SERIAL PRIMARY KEY,
+        ip_hash TEXT NOT NULL,
+        attempted_at TIMESTAMPTZ DEFAULT NOW()
+      )`))
     // Customer survey answers (public form at /survey, read in the admin under Feedback).
     // country comes from which link the customer used (?c=thailand / ?c=japan); NULL = not known.
     .then(() => pool.query(`
