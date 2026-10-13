@@ -1,4 +1,4 @@
-const { requireAuth, scopeOf } = require('../auth');
+const { requireAuth, requireSuper, scopeOf } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 
 // The list never carries photo_data: it can be hundreds of KB per row. The photo is fetched
@@ -126,14 +126,78 @@ module.exports = async (req, res, [first, second]) => {
     }
   }
 
+  // The Thailand menu book (lib/menu-book-seed.js). GET says whether it has been imported;
+  // POST replaces the whole Thailand catalog with it (the super admin confirms first in the UI).
+  if (first === 'menu-book' && req.method === 'GET') {
+    if (!await requireSuper(req, res)) return;
+    await ensureSchema();
+    const [flag, count] = await Promise.all([
+      pool.query("SELECT 1 FROM schema_flags WHERE name = 'menu_book_thailand_imported'"),
+      pool.query("SELECT COUNT(*)::int AS n FROM items WHERE country = 'thailand'"),
+    ]);
+    const seed = require('../menu-book-seed');
+    return res.status(200).json({ imported: flag.rowCount > 0, thailandItems: count.rows[0].n, bookItems: seed.items.length });
+  }
+
+  if (first === 'menu-book' && req.method === 'POST') {
+    if (!await requireSuper(req, res)) return;
+    await ensureSchema();
+    const seed = require('../menu-book-seed'); // big (photos), so only loaded here
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Item types: reuse a type with the same code (keeping its name, which other catalogs may
+      // use), else create it; then number them in the book's order.
+      const typeName = {};
+      for (const [i, t] of seed.types.entries()) {
+        let row = await client.query('SELECT name FROM item_types WHERE code = $1', [t.code]);
+        if (!row.rowCount) {
+          await client.query('INSERT INTO item_types (name, code) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING', [t.name, t.code]);
+          row = await client.query('SELECT name FROM item_types WHERE code = $1 OR name = $2 ORDER BY (code = $1) DESC LIMIT 1', [t.code, t.name]);
+        }
+        typeName[t.code] = row.rows[0].name;
+        await client.query('UPDATE item_types SET sort_order = $1 WHERE name = $2', [i + 1, typeName[t.code]]);
+      }
+      const removed = await client.query("DELETE FROM items WHERE country = 'thailand'");
+      // One INSERT for every item: a round trip per item adds up when the database is far away.
+      const cols = { category: [], name: [], price: [], code: [], desc: [], group: [], data: [], mime: [] };
+      for (const it of seed.items) {
+        const m = it.photo && /^data:(image\/jpeg);base64,(.+)$/.exec(it.photo);
+        cols.category.push(typeName[it.type]); cols.name.push(it.name); cols.price.push(it.price);
+        cols.code.push(it.code); cols.desc.push(it.description); cols.group.push(it.group);
+        cols.data.push(m ? m[2] : null); cols.mime.push(m ? m[1] : null);
+      }
+      await client.query(
+        `INSERT INTO items (category, name, menu_price, item_code, description, item_group, photo_data, photo_mime, published, country)
+         SELECT c, n, p, code, d, g, pd, pm, TRUE, 'thailand'
+         FROM unnest($1::text[], $2::text[], $3::real[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[])
+           AS x(c, n, p, code, d, g, pd, pm)`,
+        [cols.category, cols.name, cols.price, cols.code, cols.desc, cols.group, cols.data, cols.mime]
+      );
+      await client.query("INSERT INTO schema_flags (name) VALUES ('menu_book_thailand_imported') ON CONFLICT DO NOTHING");
+      await client.query('COMMIT');
+      return res.status(200).json({ removed: removed.rowCount, imported: seed.items.length });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   if (first === 'save' && req.method === 'POST') {
     const session = await requireAuth(req, res);
     if (!session) return;
     await ensureSchema();
     const { id, category, name, menuPrice, originalCost, itemCode, description, itemGroup, published, photo } = req.body || {};
     const country = countryFor(session, (req.body || {}).country);
-    if (!category || !name || menuPrice === undefined) {
-      return res.status(400).json({ error: 'category, name, and menuPrice are required' });
+    if (!category || !name) {
+      return res.status(400).json({ error: 'category and name are required' });
+    }
+    // No price is allowed: e.g. a design that is priced by the size you choose.
+    const price = menuPrice === undefined || menuPrice === null || menuPrice === '' ? null : Number(menuPrice);
+    if (price !== null && (!Number.isFinite(price) || price < 0)) {
+      return res.status(400).json({ error: 'Selling price must be a number' });
     }
     const cost = originalCost === undefined || originalCost === null || originalCost === '' ? null : Number(originalCost);
     const code = typeof itemCode === 'string' && itemCode.trim() ? itemCode.trim().toUpperCase() : null;
@@ -162,7 +226,7 @@ module.exports = async (req, res, [first, second]) => {
              photo_mime = CASE WHEN $9 THEN $11 ELSE photo_mime END,
              updated_at = NOW()
            WHERE id = $12 AND ($13::text IS NULL OR country = $13) RETURNING id`,
-          [category, name, Number(menuPrice), cost, code, desc, isPublished, group, touchPhoto, photoData, photoMime, id, fence(session)]
+          [category, name, price, cost, code, desc, isPublished, group, touchPhoto, photoData, photoMime, id, fence(session)]
         );
         if (result.rowCount === 0) return res.status(404).json({ error: 'Item not found' });
         return res.status(200).json({ id });
@@ -170,7 +234,7 @@ module.exports = async (req, res, [first, second]) => {
       const result = await pool.query(
         `INSERT INTO items (category, name, menu_price, original_cost, item_code, description, published, item_group, photo_data, photo_mime, country)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-        [category, name, Number(menuPrice), cost, code, desc, isPublished, group, photoData, photoMime, country]
+        [category, name, price, cost, code, desc, isPublished, group, photoData, photoMime, country]
       );
       return res.status(200).json({ id: result.rows[0].id });
     } catch (err) {

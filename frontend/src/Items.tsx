@@ -8,7 +8,7 @@ interface Item {
   id: number;
   category: string;
   name: string;
-  menu_price: number;
+  menu_price: number | null; // null: no price of its own (e.g. priced by size)
   original_cost: number | null;
   item_code: string | null;
   description: string | null;
@@ -365,6 +365,10 @@ export default function Items({ country }: { country: Country }) {
   const [types, setTypes] = useState<ItemType[]>([]);
   const [showTypes, setShowTypes] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  // Thailand menu book import: offered to the super admin until it has been done once.
+  const [menuBook, setMenuBook] = useState<{ imported: boolean; thailandItems: number; bookItems: number } | null>(null);
+  const [menuBookBusy, setMenuBookBusy] = useState(false);
+  const [menuBookNote, setMenuBookNote] = useState('');
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -383,10 +387,42 @@ export default function Items({ country }: { country: Country }) {
       .then((data) => setTypes(Array.isArray(data) ? data : []))
       .catch(() => {});
 
+  const loadMenuBook = () => {
+    if (country !== 'thailand' || !isSuperAdmin) return;
+    apiFetch('/items/menu-book')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setMenuBook(data))
+      .catch(() => {});
+  };
+
   useEffect(() => {
     loadItems();
     loadTypes();
+    loadMenuBook();
   }, []);
+
+  const importMenuBook = async () => {
+    if (!menuBook) return;
+    const ok = window.confirm(
+      `Replace all ${menuBook.thailandItems} Thailand items with the ${menuBook.bookItems} items from the menu book (with their photos and prices)?\n\n` +
+      'The current Thailand items will be deleted. Japan items are not touched. This cannot be undone.'
+    );
+    if (!ok) return;
+    setMenuBookBusy(true);
+    setMenuBookNote('');
+    try {
+      const res = await apiFetch('/items/menu-book', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      setMenuBookNote(`Done: removed ${data.removed} old items and imported ${data.imported} from the menu book.`);
+      await Promise.all([loadItems(), loadTypes()]);
+      loadMenuBook();
+    } catch (err) {
+      setMenuBookNote(err instanceof Error ? err.message : 'Import failed');
+    } finally {
+      setMenuBookBusy(false);
+    }
+  };
 
   // Picking a type fills in the next free Item ID for it (CK01, CK02, ...). Still editable.
   const chooseType = (name: string) => {
@@ -410,7 +446,7 @@ export default function Items({ country }: { country: Country }) {
       name: item.name,
       description: item.description ?? '',
       itemGroup: item.item_group ?? '',
-      menuPrice: String(item.menu_price),
+      menuPrice: item.menu_price === null ? '' : String(item.menu_price),
       originalCost: item.original_cost === null ? '' : String(item.original_cost),
       published: item.published,
       photo: undefined,
@@ -434,8 +470,8 @@ export default function Items({ country }: { country: Country }) {
 
   const handleSubmit = async () => {
     if (!form) return;
-    if (!form.category.trim() || !form.name.trim() || form.menuPrice === '') {
-      setFormError('Item type, name and selling price are required.');
+    if (!form.category.trim() || !form.name.trim()) {
+      setFormError('Item type and name are required.');
       return;
     }
     setSaving(true);
@@ -449,7 +485,7 @@ export default function Items({ country }: { country: Country }) {
         name: form.name.trim(),
         description: form.description,
         itemGroup: form.itemGroup,
-        menuPrice: Number(form.menuPrice),
+        menuPrice: form.menuPrice === '' ? null : Number(form.menuPrice),
         originalCost: form.originalCost === '' ? null : Number(form.originalCost),
         published: form.published,
         photo: form.photo,
@@ -507,11 +543,18 @@ export default function Items({ country }: { country: Country }) {
           </p>
         </div>
         <div className="header-actions">
+          {menuBook && !menuBook.imported && (
+            <button className="header-secondary-btn" onClick={importMenuBook} disabled={menuBookBusy}>
+              {menuBookBusy ? 'Importing menu book…' : 'Import menu book'}
+            </button>
+          )}
           <button className="header-secondary-btn" onClick={() => setShowImport(true)}>Import</button>
           {isSuperAdmin && <button className="header-secondary-btn" onClick={() => setShowTypes(true)}>Item Types</button>}
           <button className="new-order-btn" onClick={openNew}>New Item</button>
         </div>
       </header>
+
+      {menuBookNote && <p className="order-profit">{menuBookNote}</p>}
 
       {loading ? (
         <p className="empty-state">Loading…</p>
@@ -529,7 +572,7 @@ export default function Items({ country }: { country: Country }) {
               </div>
               <div className="catalog-grid">
                 {grouped[category].map((item) => {
-                  const itemProfit = item.original_cost !== null ? item.menu_price - item.original_cost : null;
+                  const itemProfit = item.original_cost !== null && item.menu_price !== null ? item.menu_price - item.original_cost : null;
                   return (
                     <button className="item-card" key={item.id} onClick={() => openEdit(item)}>
                       <div className="item-card-photo">
@@ -543,7 +586,7 @@ export default function Items({ country }: { country: Country }) {
                       <span className="item-card-code">{item.item_code ?? 'No ID'}{item.item_group ? ` · ${item.item_group}` : ''}</span>
                       <span className="item-card-name">{item.name}</span>
                       <span className="item-card-desc">{item.description ?? ''}</span>
-                      <span className="item-card-price">{money.sign}{fmt(item.menu_price)}</span>
+                      <span className="item-card-price">{item.menu_price === null ? 'No price' : `${money.sign}${fmt(item.menu_price)}`}</span>
                       <span className={`item-card-cost ${itemProfit !== null && itemProfit < 0 ? 'profit-negative' : ''}`}>
                         {item.original_cost === null
                           ? 'Cost not set'
@@ -645,7 +688,7 @@ export default function Items({ country }: { country: Country }) {
                   onChange={(e) => update('description', e.target.value)} />
               </div>
               <div className="order-field">
-                <label>Selling price ({money.code})</label>
+                <label>Selling price ({money.code}) — leave empty if priced by size</label>
                 <input type="number" min="0" className="item-input" placeholder="0" value={form.menuPrice}
                   onChange={(e) => update('menuPrice', e.target.value)} />
               </div>

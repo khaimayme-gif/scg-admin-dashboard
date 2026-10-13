@@ -149,9 +149,12 @@ module.exports = async (req, res, [first, second]) => {
     // ?country=japan for the Japan menu; Thailand is the default.
     const country = new URL(req.url, 'http://localhost').searchParams.get('country') === 'japan' ? 'japan' : 'thailand';
     const result = await pool.query(
-      `SELECT id, category, item_code, name, description, item_group, menu_price,
-         (photo_data IS NOT NULL) AS has_photo, EXTRACT(EPOCH FROM updated_at)::bigint AS v
-       FROM items WHERE published AND country = $1 ORDER BY category, item_code NULLS LAST, name`,
+      // Categories in their item type's display order (unordered types last, by name).
+      `SELECT i.id, i.category, i.item_code, i.name, i.description, i.item_group, i.menu_price,
+         (i.photo_data IS NOT NULL) AS has_photo, EXTRACT(EPOCH FROM i.updated_at)::bigint AS v
+       FROM items i LEFT JOIN item_types t ON t.name = i.category
+       WHERE i.published AND i.country = $1
+       ORDER BY t.sort_order NULLS LAST, i.category, i.item_code NULLS LAST, i.name`,
       [country]
     );
     const proto = req.headers['x-forwarded-proto'] || 'https';

@@ -78,7 +78,7 @@ interface CatalogItem {
   id: number;
   country: 'thailand' | 'japan';
   name: string;
-  menu_price: number;
+  menu_price: number | null;
   original_cost: number | null;
 }
 
