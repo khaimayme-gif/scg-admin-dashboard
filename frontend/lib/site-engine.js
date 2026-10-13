@@ -466,9 +466,15 @@ function analyse(html) {
   const titleField = title
     ? [{ id: '__title', group: 'Page', label: 'Browser tab title', type: 'text', value: title.value, hint: 'The title shown on the browser tab.' }]
     : [];
-  const all = [...titleField, ...fields, ...constSlots, ...pageSlots].slice(0, MAX_FIELDS * 2);
+  // Templates with a PIN screen between the opening page and the menu can skip it.
+  const skipPinField = canSkipPin(html)
+    ? [{ id: '__skipPin', group: 'Page', label: 'Skip the PIN page', type: 'boolean', value: false, hint: 'On: the opening button goes straight to the menu, with no PIN to enter.' }]
+    : [];
+  const all = [...titleField, ...skipPinField, ...fields, ...constSlots, ...pageSlots].slice(0, MAX_FIELDS * 2);
   return { blockFields, constSlots, pageSlots, all, title, hasData: blockFields.length > 0 };
 }
+
+const canSkipPin = (html) => html.includes("goTo('pg-lock')") && /id=["']pg-menu["']/.test(html);
 
 // What can be edited in this template.
 function extract(html) {
@@ -500,6 +506,7 @@ function render(html, values = {}, { baseUrl } = {}) {
   edits.sort((x, y) => y.start - x.start || y.end - x.end);
   let out = html;
   for (const e of edits) out = out.slice(0, e.start) + e.text + out.slice(e.end);
+  if (values.__skipPin === true && canSkipPin(html)) out = out.split("goTo('pg-lock')").join("goTo('pg-menu')");
   if (!baseUrl) return out;
   // Files renamed on the website since the templates were written (what new-gift.sh used to patch by hand).
   out = out.split('images/main/sochic-logo.png').join('images/main/main-logo.png');
