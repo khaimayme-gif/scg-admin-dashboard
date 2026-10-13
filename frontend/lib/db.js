@@ -383,6 +383,10 @@ function ensureSchema() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )`))
     .then(seedFirstUsers)
+    // Items can have no price of their own (e.g. a cake design that is priced by its size), and
+    // item types have a display order for the website menu (set by the menu book import).
+    .then(() => pool.query(`ALTER TABLE items ALTER COLUMN menu_price DROP NOT NULL`))
+    .then(() => pool.query(`ALTER TABLE item_types ADD COLUMN IF NOT EXISTS sort_order INTEGER`))
     .then(() => pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,
