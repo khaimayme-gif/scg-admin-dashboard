@@ -10,11 +10,57 @@ const { pool, ensureSchema } = require('../db');
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  // The password page on the website posts JSON from another address, which makes the browser ask first.
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
 module.exports = async (req, res, [first, second]) => {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
+
+  // The password page behind the QR on a printed card. POST /api/public/open { password }
+  //   200 { url }                      the password is right and the page is available: go there
+  //   404 { error: 'wrong' }           no note has that password
+  //   403 { error: 'not_yet', from }   it exists but is not available yet
+  //   403 { error: 'ended', until }    it was available but the end date has passed
+  //   429 { error: 'locked' }          too many wrong tries from this device for now
+  if (first === 'open' && req.method === 'POST') {
+    const password = String((req.body || {}).password || '').trim().toLowerCase().slice(0, 100);
+    if (!password) return res.status(400).json({ error: 'wrong' });
+
+    await ensureSchema();
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = (typeof forwarded === 'string' && forwarded.split(',')[0].trim()) || (req.socket && req.socket.remoteAddress) || 'unknown';
+    const ipHash = crypto.createHash('sha256').update(`${process.env.SESSION_SECRET || ''}|${ip}`).digest('hex');
+
+    // After 8 wrong passwords in 15 minutes a device has to wait, so passwords can't be guessed in bulk.
+    const since = new Date(Date.now() - 15 * 60 * 1000);
+    const failures = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM qr_note_attempts WHERE ip_hash = $1 AND attempted_at > $2',
+      [ipHash, since]
+    );
+    if (failures.rows[0].n >= 8) return res.status(429).json({ error: 'locked' });
+
+    const found = await pool.query(
+      'SELECT id, destination_url, available_from, available_until FROM qr_notes WHERE password = $1',
+      [password]
+    );
+    const note = found.rows[0];
+    if (!note) {
+      await pool.query('INSERT INTO qr_note_attempts (ip_hash) VALUES ($1)', [ipHash]);
+      await pool.query('DELETE FROM qr_note_attempts WHERE attempted_at < $1', [since]);
+      return res.status(404).json({ error: 'wrong' });
+    }
+    const now = Date.now();
+    if (note.available_from && new Date(note.available_from).getTime() > now) {
+      return res.status(403).json({ error: 'not_yet', from: note.available_from });
+    }
+    if (note.available_until && new Date(note.available_until).getTime() < now) {
+      return res.status(403).json({ error: 'ended', until: note.available_until });
+    }
+    await pool.query('UPDATE qr_notes SET opens = opens + 1, last_opened_at = NOW() WHERE id = $1', [note.id]);
+    return res.status(200).json({ url: note.destination_url });
+  }
 
   // A customer sending the survey (no login). POST /api/public/survey
   //   { name, delivery: perfect|minor|problem, rating: 1-5, feedback?, country?: thailand|japan }
