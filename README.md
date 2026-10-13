@@ -246,3 +246,16 @@ The role is enforced in the API (`lib/auth.js`, `lib/routes/*`), not just hidden
 - **First run:** when the users table is first created it gets two accounts from the old Vercel passwords: `mikimyatnoe` (super admin, password = `ADMIN_PASSWORD`) and `aeindraaung` (Japan admin, password = `JAPAN_ADMIN_PASSWORD`). After that, passwords are managed in the app and `JAPAN_ADMIN_PASSWORD` is no longer used.
 - **Emergency login:** `ADMIN_PASSWORD` still signs in as a super admin with any username, so a forgotten password or a mistake can never lock everyone out. Keep it secret.
 - Passwords are stored as salted scrypt hashes. A deleted user or a changed role takes effect within about 30 seconds. The last super admin can't be deleted or demoted, and nobody can delete or re-role themselves.
+
+## Websites (gift websites from templates)
+
+**Websites** in the sidebar makes a customer's gift website from one of the website's templates (`sochicgifts/templates/*.html`). The templates are only ever *read*: each customer's site is a row in `gift_sites` holding just the values that were changed, so the original can never be touched.
+
+1. **New Website**: pick a template and (optionally) the order it is for.
+2. The editor reads the template and builds the form by itself (`lib/site-engine.js`): names, PIN, messages, dates, colours, photos, songs, links, plus the page's own text under "More page text". A live phone preview updates as you type.
+3. Set **Published** and the available **from / until** dates, save, and share the link `https://sochicgifts.vercel.app/g/<address>` (with a QR). Outside the dates (or while unpublished) visitors see a friendly page instead.
+4. The **best-selling templates** ranking counts websites made per template.
+
+How it is served: the website's `vercel.json` rewrites `/g/:slug` to `GET /api/public/site/:slug` here, which renders the template with the saved values on the fly (edits are live at once, no deploy).
+
+New templates: add the file to `sochicgifts/templates/` and an entry to `templates/manifest.json` (`{ file, name, occasion }`). Photos and songs upload straight to Supabase Storage (same bucket and keys as the Template Library video upload); without them you can paste an address.

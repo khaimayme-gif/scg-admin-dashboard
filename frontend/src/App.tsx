@@ -14,6 +14,7 @@ import Templates from './Templates';
 import Dashboard from './Dashboard';
 import Feedback from './Feedback';
 import QrNotes from './QrNotes';
+import Websites from './Websites';
 import { RoleContext, ROLE_PAGES, ROLE_HOME, isRole } from './role';
 import type { Role } from './role';
 import SochicBoard from './SochicBoard';
@@ -125,6 +126,7 @@ export default function App() {
         )}
         {page === 'feedback' && <Feedback />}
         {page === 'qrnotes' && <QrNotes />}
+        {page === 'websites' && <Websites />}
         {page === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {page === 'qr' && <QRCodeGenerator />}
         {page === 'settings' && <Settings />}

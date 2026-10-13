@@ -306,6 +306,30 @@ function ensureSchema() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )`))
+    // Gift websites: one row per customer website, made from a template. The template files stay
+    // untouched on the website; this row holds only what was changed for the customer.
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS gift_sites (
+        id SERIAL PRIMARY KEY,
+        slug TEXT NOT NULL UNIQUE,
+        template TEXT NOT NULL,
+        customer_name TEXT NOT NULL,
+        order_id INTEGER,
+        order_no TEXT,
+        country TEXT,
+        values_json TEXT NOT NULL DEFAULT '{}',
+        published BOOLEAN NOT NULL DEFAULT FALSE,
+        available_from TIMESTAMPTZ,
+        available_until TIMESTAMPTZ,
+        note TEXT,
+        views INTEGER NOT NULL DEFAULT 0,
+        last_viewed_at TIMESTAMPTZ,
+        created_by TEXT NOT NULL DEFAULT 'superadmin',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`))
+    .then(() => pool.query(`
+      CREATE INDEX IF NOT EXISTS gift_sites_template ON gift_sites (template)`))
     // QR love notes: a printed card carries the same QR for everyone, which opens a password page.
     // The password written on the card finds the note, and the note says which customer page to open
     // and when it is available.

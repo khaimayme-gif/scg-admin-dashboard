@@ -5,9 +5,9 @@ export type Role = 'superadmin' | 'thai' | 'japan';
 // Which pages each role can open. The server enforces the same limits on the data itself; this
 // only decides what the menu shows and which page loads first.
 export const ROLE_PAGES: Record<Role, string[]> = {
-  superadmin: ['dashboard', 'board', 'quotation', 'items-thailand', 'items-japan', 'qr', 'orders', 'feedback', 'qrnotes', 'templates', 'expenses', 'settings'],
-  thai: ['dashboard', 'board', 'orders', 'quotation', 'items-thailand', 'qr', 'qrnotes', 'feedback'],
-  japan: ['dashboard', 'board', 'orders', 'quotation', 'items-japan', 'qr', 'qrnotes', 'feedback'],
+  superadmin: ['dashboard', 'board', 'quotation', 'items-thailand', 'items-japan', 'qr', 'orders', 'feedback', 'qrnotes', 'websites', 'templates', 'expenses', 'settings'],
+  thai: ['dashboard', 'board', 'orders', 'quotation', 'items-thailand', 'qr', 'qrnotes', 'websites', 'feedback'],
+  japan: ['dashboard', 'board', 'orders', 'quotation', 'items-japan', 'qr', 'qrnotes', 'websites', 'feedback'],
 };
 
 export const ROLE_HOME: Record<Role, string> = { superadmin: 'dashboard', thai: 'dashboard', japan: 'dashboard' };
