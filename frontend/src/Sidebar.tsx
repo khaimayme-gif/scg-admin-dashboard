@@ -29,8 +29,16 @@ const MODULES: Module[] = [
   { id: 'orders', label: 'Orders', ready: true },
   { id: 'feedback', label: 'Customer Feedback', ready: true },
   { id: 'qr', label: 'QR Code Generator', ready: true },
-  { id: 'qrnotes', label: 'QR Love Notes', ready: true },
-  { id: 'websites', label: 'Websites', ready: true },
+  {
+    id: 'digital',
+    label: 'Digital Gifts',
+    ready: true,
+    children: [
+      { id: 'templates', label: 'Template Library' },
+      { id: 'qrnotes', label: 'QR Love Notes' },
+      { id: 'websites', label: 'Websites' },
+    ],
+  },
   {
     id: 'items',
     label: 'Items',
@@ -41,7 +49,6 @@ const MODULES: Module[] = [
     ],
   },
   { id: 'expenses', label: 'Expense Tracker', ready: true },
-  { id: 'templates', label: 'Template Library', ready: true },
   { id: 'settings', label: 'Settings', ready: true },
 ];
 
