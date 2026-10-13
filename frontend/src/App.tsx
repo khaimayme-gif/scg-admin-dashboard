@@ -14,6 +14,7 @@ import Templates from './Templates';
 import Dashboard from './Dashboard';
 import Feedback from './Feedback';
 import QrNotes from './QrNotes';
+import type { QrNoteIntent } from './QrNotes';
 import Websites from './Websites';
 import { RoleContext, ROLE_PAGES, ROLE_HOME, isRole } from './role';
 import type { Role } from './role';
@@ -31,6 +32,8 @@ export default function App() {
   // "Make Order" on a quotation hands it to the Orders page, which opens the prefilled form.
   const [menuOpen, setMenuOpen] = useState(false);
   const [orderIntent, setOrderIntent] = useState<OrderIntent | null>(null);
+  // "Create QR note" on a website hands it to QR Love Notes, which opens the form already filled in.
+  const [qrNoteIntent, setQrNoteIntent] = useState<QrNoteIntent | null>(null);
 
   const handleMakeOrder = (quotation: QuotationForOrder) => {
     setOrderIntent({ kind: 'fromQuotation', quotation });
@@ -125,8 +128,8 @@ export default function App() {
           />
         )}
         {page === 'feedback' && <Feedback />}
-        {page === 'qrnotes' && <QrNotes />}
-        {page === 'websites' && <Websites />}
+        {page === 'qrnotes' && <QrNotes intent={qrNoteIntent} onIntentHandled={() => setQrNoteIntent(null)} />}
+        {page === 'websites' && <Websites onCreateQrNote={(intent) => { setQrNoteIntent(intent); setActive('qrnotes'); }} />}
         {page === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {page === 'qr' && <QRCodeGenerator />}
         {page === 'settings' && <Settings />}
