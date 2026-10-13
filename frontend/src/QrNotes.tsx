@@ -138,7 +138,18 @@ function GateQr() {
   );
 }
 
-export default function QrNotes() {
+// What a website hands over when you press "Create QR note" on it.
+export interface QrNoteIntent {
+  customerName: string;
+  orderRef: string;
+  destinationUrl: string;
+  availableFrom: string | null; // ISO
+  availableUntil: string | null;
+  country: Country | '';
+  occasion: Occasion;
+}
+
+export default function QrNotes({ intent, onIntentHandled }: { intent?: QrNoteIntent | null; onIntentHandled?: () => void }) {
   const role = useRole();
   const isSuper = role === 'superadmin';
   const [notes, setNotes] = useState<Note[]>([]);
@@ -160,6 +171,33 @@ export default function QrNotes() {
   useEffect(() => {
     load();
   }, []);
+
+  // "Create QR note" on a website: open the form already filled in, or the existing note for that
+  // website if one was made before, once the notes have loaded.
+  const [fromSite, setFromSite] = useState('');
+  useEffect(() => {
+    if (!intent || loading) return;
+    const existing = notes.find((n) => n.destination_url.replace(/\/+$/, '') === intent.destinationUrl.replace(/\/+$/, ''));
+    if (existing) {
+      openEdit(existing);
+      setFromSite(`This website already has a QR note (password ${existing.password}). You can edit it here.`);
+    } else {
+      setForm({
+        ...emptyForm(),
+        customerName: intent.customerName,
+        occasion: intent.occasion,
+        orderRef: intent.orderRef,
+        destinationUrl: intent.destinationUrl,
+        country: intent.country,
+        availableFrom: toInput(intent.availableFrom),
+        availableUntil: toInput(intent.availableUntil),
+      });
+      setError('');
+      setFromSite('Filled in from the website. Type the password you will write on the card, then save.');
+    }
+    onIntentHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intent, loading]);
 
   const toggle = (id: number) =>
     setExpanded((prev) => {
@@ -379,8 +417,9 @@ export default function QrNotes() {
           <div className="modal-card">
             <div className="modal-header">
               <h2 className="panel-label">{form.id ? 'Edit QR note' : 'New QR note'}</h2>
-              <button className="item-remove" onClick={() => setForm(null)} aria-label="Close">×</button>
+              <button className="item-remove" onClick={() => { setForm(null); setFromSite(''); }} aria-label="Close">×</button>
             </div>
+            {fromSite && <p className="from-site-note">{fromSite}</p>}
 
             <div className="order-form-grid">
               <div className="order-field">

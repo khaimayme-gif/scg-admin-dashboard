@@ -2,6 +2,7 @@ import { Fragment, useState, useEffect, useRef } from 'react';
 import QRCodeStyling from 'qr-code-styling';
 import { apiFetch, jsonBody } from './api';
 import { useRole } from './role';
+import type { QrNoteIntent } from './QrNotes';
 
 // The public website that customers' gift pages are shown on: <SITE>/g/<address>.
 const SITE = 'https://sochicgifts.vercel.app';
@@ -225,12 +226,25 @@ function FieldInput({ field, value, onChange }: { field: Field; value: string | 
 
 // ---------------------------------------------------------------- the editor
 
-function Editor({ start, templates, orders, onClose, onSaved }: {
+// The QR love note a website would get, so it can be created with one click.
+const occasionOf = (text: string): QrNoteIntent['occasion'] => {
+  const t = text.toLowerCase();
+  if (t.includes('birthday')) return 'birthday';
+  if (t.includes('anniversary')) return 'anniversary';
+  if (t.includes('graduat')) return 'graduation';
+  if (t.includes('thank')) return 'thank_you';
+  if (t.includes('sorry') || t.includes('apolog')) return 'apology';
+  if (t.includes('love')) return 'love';
+  return 'other';
+};
+
+function Editor({ start, templates, orders, onClose, onSaved, onCreateQrNote }: {
   start: EditorStart;
   templates: TemplateInfo[];
   orders: OrderRow[];
   onClose: () => void;
   onSaved: () => void;
+  onCreateQrNote?: (intent: QrNoteIntent) => void;
 }) {
   const isSuper = useRole() === 'superadmin';
   const [id, setId] = useState<number | undefined>(start.id);
@@ -252,6 +266,11 @@ function Editor({ start, templates, orders, onClose, onSaved }: {
   const [rendering, setRendering] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false); // changes made since the last save
+  const markDirty = () => {
+    setSaved(false);
+    setDirty(true);
+  };
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'edit' | 'preview'>('edit');
   const [copied, setCopied] = useState(false);
@@ -304,7 +323,7 @@ function Editor({ start, templates, orders, onClose, onSaved }: {
   const byId = new Map((fields ?? []).map((f) => [f.id, f]));
   const valueOf = (f: Field) => (f.id in values ? values[f.id] : f.value);
   const setValue = (f: Field, v: string | number | boolean) => {
-    setSaved(false);
+    markDirty();
     setValues((prev) => {
       const next = { ...prev };
       if (String(v) === String(f.value)) delete next[f.id];
@@ -349,6 +368,7 @@ function Editor({ start, templates, orders, onClose, onSaved }: {
       setId(data.id);
       setSlug(data.slug);
       setSaved(true);
+      setDirty(false);
       onSaved();
     } catch {
       // a 401 has already sent us back to login
@@ -382,7 +402,7 @@ function Editor({ start, templates, orders, onClose, onSaved }: {
           <div className="field-group-body">
             {list.map((f) => (
               <div className={`site-field ${f.id in values ? 'is-changed' : ''}`} key={f.id}>
-                <label>{f.label}{f.id in values && <button type="button" className="field-reset" onClick={() => { setSaved(false); setValues((p) => { const n = { ...p }; delete n[f.id]; return n; }); }}>Reset</button>}</label>
+                <label>{f.label}{f.id in values && <button type="button" className="field-reset" onClick={() => { markDirty(); setValues((p) => { const n = { ...p }; delete n[f.id]; return n; }); }}>Reset</button>}</label>
                 <FieldInput field={f} value={valueOf(f)} onChange={(v) => setValue(f, v)} />
                 {f.hint && <p className="stat-sub" style={{ margin: '3px 0 0' }}>{f.hint}</p>}
               </div>
@@ -419,11 +439,11 @@ function Editor({ start, templates, orders, onClose, onSaved }: {
             <div className="order-form-grid">
               <div className="order-field">
                 <label>Customer name</label>
-                <input className="item-input" value={customerName} onChange={(e) => { setCustomerName(e.target.value); setSaved(false); }} />
+                <input className="item-input" value={customerName} onChange={(e) => { setCustomerName(e.target.value); markDirty(); }} />
               </div>
               <div className="order-field">
                 <label>Order</label>
-                <select className="item-input" value={orderId ?? ''} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setOrderId(v); setSaved(false); const o = orders.find((x) => x.id === v); if (o && !customerName) setCustomerName(o.customer_name); }}>
+                <select className="item-input" value={orderId ?? ''} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setOrderId(v); markDirty(); const o = orders.find((x) => x.id === v); if (o && !customerName) setCustomerName(o.customer_name); }}>
                   <option value="">Not linked</option>
                   {orders.map((o) => <option key={o.id} value={o.id}>{o.order_no ?? `#${o.id}`} · {o.customer_name}</option>)}
                 </select>
@@ -431,7 +451,7 @@ function Editor({ start, templates, orders, onClose, onSaved }: {
               {isSuper && (
                 <div className="order-field">
                   <label>Country</label>
-                  <select className="item-input" value={country} onChange={(e) => { setCountry(e.target.value as typeof country); setSaved(false); }}>
+                  <select className="item-input" value={country} onChange={(e) => { setCountry(e.target.value as typeof country); markDirty(); }}>
                     <option value="">Not set</option>
                     <option value="thailand">Thailand</option>
                     <option value="japan">Japan</option>
@@ -441,35 +461,35 @@ function Editor({ start, templates, orders, onClose, onSaved }: {
               {id && (
                 <div className="order-field">
                   <label>Address ending</label>
-                  <input className="item-input" value={slug} onChange={(e) => { setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setSaved(false); }} />
+                  <input className="item-input" value={slug} onChange={(e) => { setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); markDirty(); }} />
                 </div>
               )}
             </div>
 
             <label className="frame-toggle publish-toggle">
-              <input type="checkbox" checked={published} onChange={(e) => { setPublished(e.target.checked); setSaved(false); }} />
+              <input type="checkbox" checked={published} onChange={(e) => { setPublished(e.target.checked); markDirty(); }} />
               Published: visitors can open the link{published ? '' : ' (off = only you can preview it)'}
             </label>
             <div className="order-form-grid">
               <div className="order-field">
                 <label>Available from (empty = right away)</label>
-                <input type="datetime-local" className="item-input" value={from} onChange={(e) => { setFrom(e.target.value); setSaved(false); }} />
+                <input type="datetime-local" className="item-input" value={from} onChange={(e) => { setFrom(e.target.value); markDirty(); }} />
               </div>
               <div className="order-field">
                 <label>Available until (empty = no end)</label>
-                <input type="datetime-local" className="item-input" value={until} onChange={(e) => { setUntil(e.target.value); setSaved(false); }} />
+                <input type="datetime-local" className="item-input" value={until} onChange={(e) => { setUntil(e.target.value); markDirty(); }} />
               </div>
             </div>
             <div className="until-presets">
               <span className="stat-sub">Until:</span>
               {([[10, '10 days'], [30, '1 month'], [90, '3 months'], [365, '1 year']] as [number, string][]).map(([days, label]) => (
-                <button key={label} type="button" className="preset-btn" onClick={() => { setUntil(plusDays(from, days)); setSaved(false); }}>{label} after the start</button>
+                <button key={label} type="button" className="preset-btn" onClick={() => { setUntil(plusDays(from, days)); markDirty(); }}>{label} after the start</button>
               ))}
-              {until && <button type="button" className="preset-btn" onClick={() => { setUntil(''); setSaved(false); }}>No end</button>}
+              {until && <button type="button" className="preset-btn" onClick={() => { setUntil(''); markDirty(); }}>No end</button>}
             </div>
             <div className="order-field" style={{ marginTop: 12 }}>
               <label>Note (only you see it)</label>
-              <input className="item-input" value={note} onChange={(e) => { setNote(e.target.value); setSaved(false); }} />
+              <input className="item-input" value={note} onChange={(e) => { setNote(e.target.value); markDirty(); }} />
             </div>
 
             {id && slug && (
@@ -483,6 +503,25 @@ function Editor({ start, templates, orders, onClose, onSaved }: {
                     <button className="add-item-btn" onClick={() => qr.current?.download({ name: `website-${slug}`, extension: 'png' })}>Download QR</button>
                     <a className="order-edit-btn" href={linkFor(slug)} target="_blank" rel="noreferrer">Open</a>
                   </div>
+                  {onCreateQrNote && (
+                    <button
+                      type="button"
+                      className="save-btn qr-note-btn"
+                      disabled={dirty}
+                      title={dirty ? 'Save your changes first' : ''}
+                      onClick={() => onCreateQrNote({
+                        customerName,
+                        orderRef: orders.find((o) => o.id === orderId)?.order_no ?? '',
+                        destinationUrl: linkFor(slug),
+                        availableFrom: from ? new Date(from).toISOString() : null,
+                        availableUntil: until ? new Date(until).toISOString() : null,
+                        country,
+                        occasion: occasionOf(`${template?.occasion ?? ''} ${template?.name ?? ''}`),
+                      })}
+                    >
+                      Create QR note for the card
+                    </button>
+                  )}
                   {!published && <p className="stat-sub" style={{ margin: 0 }}>Turn on “Published” and save, or the customer will see a “not available” page.</p>}
                 </div>
               </div>
@@ -528,7 +567,7 @@ function Editor({ start, templates, orders, onClose, onSaved }: {
 
 // ---------------------------------------------------------------- the page
 
-export default function Websites() {
+export default function Websites({ onCreateQrNote }: { onCreateQrNote?: (intent: QrNoteIntent) => void }) {
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [templates, setTemplates] = useState<TemplateInfo[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -644,6 +683,7 @@ export default function Websites() {
         orders={orders}
         onClose={() => { setEditor(null); load(); }}
         onSaved={load}
+        onCreateQrNote={onCreateQrNote}
       />
     );
   }
@@ -734,6 +774,20 @@ export default function Websites() {
                               <div className="detail-actions">
                                 <button className="save-btn" onClick={() => openSite(s)}>Edit</button>
                                 <button className="add-item-btn" onClick={() => copyLink(s)}>{copiedId === s.id ? 'Copied ✓' : 'Copy link'}</button>
+                                {onCreateQrNote && (
+                                  <button className="add-item-btn" onClick={() => {
+                                    const t = templates.find((x) => x.file === s.template);
+                                    onCreateQrNote({
+                                      customerName: s.customer_name,
+                                      orderRef: s.order_no ?? '',
+                                      destinationUrl: linkFor(s.slug),
+                                      availableFrom: s.available_from,
+                                      availableUntil: s.available_until,
+                                      country: s.country ?? '',
+                                      occasion: occasionOf(`${t?.occasion ?? ''} ${t?.name ?? ''}`),
+                                    });
+                                  }}>Create QR note</button>
+                                )}
                                 <button className="order-edit-btn danger-link" onClick={() => remove(s)}>Delete</button>
                               </div>
                             </div>
