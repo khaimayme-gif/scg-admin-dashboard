@@ -6,12 +6,31 @@
 //   GET /api/public/templates   -> { templates: [...] } published digital gift templates, in order
 const crypto = require('crypto');
 const { pool, ensureSchema } = require('../db');
+const engine = require('../site-engine');
+const { LANDING_URL, getTemplateHtml } = require('../site-templates');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   // The password page on the website posts JSON from another address, which makes the browser ask first.
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+// The page shown instead of a gift when it is missing, not open yet, over, or can't be loaded.
+function statusPage(kind, date) {
+  const day = date ? new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const text = {
+    missing: ['ဤစာမျက်နှာကို ရှာမတွေ့ပါ။', 'We could not find this gift page.'],
+    soon: [`ဤစာမျက်နှာကို ${day} မှ စ၍ ဖွင့်နိုင်ပါမည်။`, `This gift opens on ${day}.`],
+    ended: ['ဤစာမျက်နှာ၏ သက်တမ်း ကုန်ဆုံးသွားပါပြီ။', 'This gift page is no longer available.'],
+    error: ['ယခု ဖွင့်၍ မရပါ။ ခဏနေမှ ပြန်ကြိုးစားပါ။', 'We could not open this page just now. Please try again in a moment.'],
+  }[kind];
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>So Chic Gifts</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(700px 420px at 50% 0%,#FFEEF3,#fff 70%);font-family:'Noto Sans Myanmar','Inter',sans-serif;color:#161616;text-align:center}
+.c{max-width:380px;background:#fff;border:1px solid #F0E6E9;border-radius:22px;padding:34px 26px}img{width:76px;height:76px;border-radius:50%;margin-bottom:14px}
+p{margin:0 0 6px;line-height:1.9;font-size:15px}.en{font-family:'Inter',sans-serif;color:#8F7880;font-size:14px}.f{margin-top:18px;font-family:'Inter',sans-serif;font-size:12px;color:#9A9A95}</style></head>
+<body><div class="c"><img src="${LANDING_URL}/images/main/main-logo.png" alt="So Chic Gifts"><p>${text[0]}</p><p class="en">${text[1]}</p><div class="f">made with love by sochicgifts</div></div></body></html>`;
 }
 
 module.exports = async (req, res, [first, second]) => {
@@ -97,6 +116,34 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  // A customer's gift website: GET /api/public/site/:slug (shown on the website as /g/:slug).
+  // Only published sites inside their available dates are shown; otherwise a friendly page.
+  if (first === 'site' && second) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex');
+    const slug = String(second).toLowerCase();
+    await ensureSchema();
+    const found = /^[a-z0-9][a-z0-9-]{1,60}$/.test(slug)
+      ? await pool.query('SELECT id, template, values_json, published, available_from, available_until FROM gift_sites WHERE slug = $1', [slug])
+      : { rows: [] };
+    const site = found.rows[0];
+    if (!site || !site.published) return res.status(404).send(statusPage('missing'));
+    const now = Date.now();
+    if (site.available_from && new Date(site.available_from).getTime() > now) return res.status(200).send(statusPage('soon', site.available_from));
+    if (site.available_until && new Date(site.available_until).getTime() < now) return res.status(200).send(statusPage('ended'));
+
+    let html;
+    try {
+      html = await getTemplateHtml(site.template);
+    } catch (err) {
+      console.error('Could not load a template for a gift website', site.template, err);
+    }
+    if (!html) return res.status(502).send(statusPage('error'));
+    await pool.query('UPDATE gift_sites SET views = views + 1, last_viewed_at = NOW() WHERE id = $1', [site.id]);
+    return res.status(200).send(engine.render(html, JSON.parse(site.values_json), { baseUrl: `${LANDING_URL}/` }));
+  }
 
   if (first === 'menu') {
     await ensureSchema();

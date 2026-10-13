@@ -25,6 +25,7 @@ const ROUTES = {
   quotations: require('../lib/routes/quotations'),
   expenses: require('../lib/routes/expenses'),
   'item-types': require('../lib/routes/item-types'),
+  sites: require('../lib/routes/sites'),
   'qr-notes': require('../lib/routes/qr-notes'),
   survey: require('../lib/routes/survey'),
   users: require('../lib/routes/users'),
