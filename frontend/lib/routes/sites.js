@@ -6,7 +6,8 @@ const crypto = require('crypto');
 const { requireAuth, scopeOf } = require('../auth');
 const { pool, ensureSchema } = require('../db');
 const { LANDING_URL, getManifest, getTemplateHtml } = require('../site-templates');
-const engine = require('../site-engine');
+// Loaded when first used, so a problem in the engine can't stop the rest of the API from starting.
+const engine = { extract: (...a) => require('../site-engine').extract(...a), render: (...a) => require('../site-engine').render(...a) };
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{2,40}$/;
 const MAX_VALUES_BYTES = 300 * 1024;

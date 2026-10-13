@@ -6,7 +6,6 @@
 //   GET /api/public/templates   -> { templates: [...] } published digital gift templates, in order
 const crypto = require('crypto');
 const { pool, ensureSchema } = require('../db');
-const engine = require('../site-engine');
 const { LANDING_URL, getTemplateHtml } = require('../site-templates');
 
 function cors(res) {
@@ -142,7 +141,7 @@ module.exports = async (req, res, [first, second]) => {
     }
     if (!html) return res.status(502).send(statusPage('error'));
     await pool.query('UPDATE gift_sites SET views = views + 1, last_viewed_at = NOW() WHERE id = $1', [site.id]);
-    return res.status(200).send(engine.render(html, JSON.parse(site.values_json), { baseUrl: `${LANDING_URL}/` }));
+    return res.status(200).send(require('../site-engine').render(html, JSON.parse(site.values_json), { baseUrl: `${LANDING_URL}/` }));
   }
 
   if (first === 'menu') {
