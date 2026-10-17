@@ -247,6 +247,12 @@ The role is enforced in the API (`lib/auth.js`, `lib/routes/*`), not just hidden
 - **Emergency login:** `ADMIN_PASSWORD` still signs in as a super admin with any username, so a forgotten password or a mistake can never lock everyone out. Keep it secret.
 - Passwords are stored as salted scrypt hashes. A deleted user or a changed role takes effect within about 30 seconds. The last super admin can't be deleted or demoted, and nobody can delete or re-role themselves.
 
+## Love Notes (printed cards)
+
+**Love Notes** in the sidebar makes the printed love note that comes free with every order. Pick a template, change the greeting, the message and the "From" name (the date defaults to today), then Download (PNG) or Print. Everything else on the card is fixed artwork. It runs entirely in the browser (`src/loveNoteImage.ts` draws the card, `src/LoveNotes.tsx` is the page); nothing is stored.
+
+To add a template, add the artwork (with the editable text removed) to `src/assets/` and a new entry in `LOVE_NOTE_TEMPLATES` with the pixel positions of the date, greeting, message and name. A sharper copy of the same artwork can replace the file: set `width`/`height` to its pixel size and scale the positions to match.
+
 ## Websites (gift websites from templates)
 
 **Websites** in the sidebar makes a customer's gift website from one of the website's templates (`sochicgifts/templates/*.html`). The templates are only ever *read*: each customer's site is a row in `gift_sites` holding just the values that were changed, so the original can never be touched.

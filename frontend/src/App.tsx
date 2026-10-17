@@ -14,6 +14,7 @@ import Templates from './Templates';
 import Dashboard from './Dashboard';
 import Feedback from './Feedback';
 import QrNotes from './QrNotes';
+import LoveNotes from './LoveNotes';
 import type { QrNoteIntent } from './QrNotes';
 import Websites from './Websites';
 import { RoleContext, ROLE_PAGES, ROLE_HOME, isRole } from './role';
@@ -132,6 +133,7 @@ export default function App() {
         {page === 'websites' && <Websites onCreateQrNote={(intent) => { setQrNoteIntent(intent); setActive('qrnotes'); }} />}
         {page === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {page === 'qr' && <QRCodeGenerator />}
+        {page === 'lovenotes' && <LoveNotes />}
         {page === 'settings' && <Settings />}
         {page === 'items-thailand' && <Items key="thailand" country="thailand" />}
         {page === 'items-japan' && <Items key="japan" country="japan" />}
