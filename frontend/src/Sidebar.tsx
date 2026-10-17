@@ -29,6 +29,7 @@ const MODULES: Module[] = [
   { id: 'orders', label: 'Orders', ready: true },
   { id: 'feedback', label: 'Customer Feedback', ready: true },
   { id: 'qr', label: 'QR Code Generator', ready: true },
+  { id: 'lovenotes', label: 'Love Notes', ready: true },
   {
     id: 'digital',
     label: 'Digital Gifts',
