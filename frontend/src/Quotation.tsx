@@ -95,6 +95,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  // The saved quotation being edited in the form, or null when the form makes a new one.
+  const [editing, setEditing] = useState<Quotation | null>(null);
 
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
@@ -147,16 +149,24 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
   // Item prices are typed in yen for Japan and in baht for everywhere else.
   const priceCurrency: PriceCurrency = feePlace === 'Japan' ? 'JPY' : 'THB';
 
-  // Everything goes through THB with the Settings rates, like the server does.
+  // Everything goes through THB with the Settings rates, like the server does. A quotation being edited
+  // keeps the rates it was made with (the server does the same), falling back to Settings for a missing one.
+  const calcRates: Rates | null = editing
+    ? (() => {
+        const thbToJpy = editing.rate_thb_to_jpy || rates?.thbToJpy;
+        const thbToMmk = editing.rate_thb_to_mmk || rates?.thbToMmk;
+        return thbToJpy && thbToMmk ? { thbToJpy, thbToMmk } : rates;
+      })()
+    : rates;
   const needsRates = priceCurrency === 'JPY' || payCurrency !== 'THB' || feePlace === 'Japan';
-  const ready = !needsRates || Boolean(rates);
-  const toThb = (amount: number, cur: PriceCurrency) => (cur === 'JPY' && rates ? amount / rates.thbToJpy : amount);
+  const ready = !needsRates || Boolean(calcRates);
+  const toThb = (amount: number, cur: PriceCurrency) => (cur === 'JPY' && calcRates ? amount / calcRates.thbToJpy : amount);
   const fromThb = (thb: number, cur: PayCurrency) =>
-    !rates ? thb : cur === 'JPY' ? thb * rates.thbToJpy : cur === 'MMK' ? thb * rates.thbToMmk : thb;
+    !calcRates ? thb : cur === 'JPY' ? thb * calcRates.thbToJpy : cur === 'MMK' ? thb * calcRates.thbToMmk : thb;
   const totalThb = toThb(totalEntry, priceCurrency);
   const totalPay = priceCurrency === payCurrency ? totalEntry : Math.round(fromThb(totalThb, payCurrency));
   // Japan quotations get the SochicGifts platform fee, worked out from the yen total.
-  const totalJpy = priceCurrency === 'JPY' ? totalEntry : rates ? Math.round(totalThb * rates.thbToJpy) : null;
+  const totalJpy = priceCurrency === 'JPY' ? totalEntry : calcRates ? Math.round(totalThb * calcRates.thbToJpy) : null;
   const platformFee = feePlace === 'Japan' && totalJpy !== null ? platformFeeJpy(totalJpy) : null;
 
   const handleSubmit = async () => {
@@ -171,7 +181,8 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
     setError('');
     setSaving(true);
     try {
-      const res = await apiFetch('/quotations/save', jsonBody({
+      const res = await apiFetch(editing ? '/quotations/update' : '/quotations/save', jsonBody({
+        ...(editing ? { id: editing.id } : {}),
         customerName,
         channel,
         quoteDate,
@@ -190,6 +201,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
       }
       await res.json();
       setShowForm(false);
+      setEditing(null);
       loadHistory();
     } catch {
       // a 401 has already sent us back to login
@@ -198,7 +210,26 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
     }
   };
 
+  const closeForm = () => {
+    setShowForm(false);
+    setEditing(null);
+  };
+
+  // Opens the form with a saved quotation's details so any of them can be changed.
+  const startEdit = (q: Quotation) => {
+    setEditing(q);
+    setShowForm(true);
+    setCustomerName(q.customer_name);
+    setChannel(q.channel);
+    setQuoteDate(q.quote_date);
+    setOrderPlace(q.order_place);
+    setPayCurrency(payCur(q));
+    setItems(q.items.map((it) => ({ name: it.name, sellingPrice: String(it.sellingPrice), originalPrice: String(it.originalPrice) })));
+    setError('');
+  };
+
   const startNew = () => {
+    setEditing(null);
     setShowForm(true);
     setCustomerName('');
     setChannel('tiktok');
@@ -209,7 +240,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
     setError('');
   };
 
-  // Saved quotations can't be edited, but the currency shown under the total can be switched.
+  // The currency shown under the total can also be switched on its own, without opening the form.
   const [switchingId, setSwitchingId] = useState<number | null>(null);
   const changePayCurrency = async (q: Quotation, currency: PayCurrency) => {
     if (currency === payCur(q)) return;
@@ -308,6 +339,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                 {lastQuotation.order_id ? `Open order ${lastQuotation.order_no ?? ''}` : 'Make Order'}
               </button>
             )}
+            <button className="add-item-btn" onClick={() => startEdit(lastQuotation)}>Edit</button>
           </div>
         </div>
       )}
@@ -316,9 +348,14 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
         <div className="modal-backdrop">
         <div className="modal-card">
           <div className="modal-header">
-            <h2 className="panel-label">New quotation</h2>
-            <button className="item-remove" onClick={() => setShowForm(false)} aria-label="Close">×</button>
+            <h2 className="panel-label">{editing ? `Edit quotation ${editing.quote_no}` : 'New quotation'}</h2>
+            <button className="item-remove" onClick={closeForm} aria-label="Close">×</button>
           </div>
+          {editing?.order_id && (
+            <p className="warn-text">
+              Order {editing.order_no} was already made from this quotation. Changes here don't change that order, so edit the order too if it needs the same change.
+            </p>
+          )}
 
           <div className="order-form-grid">
             <div className="order-field">
@@ -355,7 +392,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                 setOrderPlace(place);
                 setPayCurrency(defaultsFor(place).pay);
               }}>
-                {places.map((p) => (
+                {(editing && !places.includes(editing.order_place) ? [...places, editing.order_place] : places).map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -446,9 +483,9 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
 
           <div className="order-form-actions">
             <button className="save-btn" onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Saving…' : 'Create quotation'}
+              {saving ? 'Saving…' : editing ? 'Save changes' : 'Create quotation'}
             </button>
-            <button className="add-item-btn" onClick={() => setShowForm(false)} disabled={saving}>
+            <button className="add-item-btn" onClick={closeForm} disabled={saving}>
               Cancel
             </button>
           </div>
@@ -567,6 +604,7 @@ export default function Quotation({ onMakeOrder }: QuotationProps) {
                                 >
                                   {downloadingId === q.id ? 'Preparing…' : 'Download'}
                                 </button>
+                                <button className="add-item-btn" onClick={() => startEdit(q)}>Edit</button>
                                 <button className="order-edit-btn danger-link" onClick={() => handleDelete(q)}>Delete</button>
                               </div>
                             </div>

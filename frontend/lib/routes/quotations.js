@@ -28,6 +28,65 @@ const nextQuoteNo = async (client) => {
   return `${prefix}-${String(last + 1).padStart(3, '0')}`;
 };
 
+// Works out everything a quotation stores from what was typed. All amounts are calculated here, never
+// trusted from the browser. Prices are typed in the price currency (THB, or JPY for Japan); everything
+// is converted through THB with the given rates:
+//   total   = sum of selling prices (what the customer is quoted)
+//   revenue = sum of (selling price - original price)
+// Item prices and the total stay in the price currency; the currency the customer pays in only adds
+// the total in that currency, shown under the total. Returns { error } or { values }.
+const priceQuote = ({ items, payCurrency, orderPlace }, { thbToJpy, thbToMmk }) => {
+  // Prices are typed in yen for Japan and in baht everywhere else; the browser doesn't choose.
+  const priceCurrency = orderPlace === 'Japan' ? 'JPY' : 'THB';
+
+  const cleanItems = (Array.isArray(items) ? items : [])
+    .map((i) => ({
+      name: String(i.name || '').trim(),
+      sellingPrice: Number(i.sellingPrice) || 0,
+      originalPrice: Number(i.originalPrice) || 0,
+    }))
+    .filter((i) => i.name);
+  if (cleanItems.length === 0) return { error: 'Add at least one item' };
+
+  // Which rates this quotation can't do without.
+  const needsJpy = priceCurrency === 'JPY' || payCurrency === 'JPY' || orderPlace === 'Japan';
+  if ((needsJpy && !thbToJpy) || (payCurrency === 'MMK' && !thbToMmk)) {
+    return { error: 'Set the exchange rates in Settings first.' };
+  }
+
+  const toThb = (amount, cur) => (cur === 'JPY' ? amount / thbToJpy : amount);
+  const fromThb = (thb, cur) => (cur === 'JPY' ? thb * thbToJpy : cur === 'MMK' ? thb * thbToMmk : thb);
+
+  const totalEntry = cleanItems.reduce((sum, i) => sum + i.sellingPrice, 0);
+  const originalEntry = cleanItems.reduce((sum, i) => sum + i.originalPrice, 0);
+
+  const totalThb = toThb(totalEntry, priceCurrency);
+  const totalPay = priceCurrency === payCurrency ? totalEntry : Math.round(fromThb(totalThb, payCurrency));
+  const originalThb = toThb(originalEntry, priceCurrency);
+  const revenueThb = totalThb - originalThb;
+  const totalMmk = thbToMmk ? Math.round(totalThb * thbToMmk) : null;
+  const totalJpy = priceCurrency === 'JPY' ? totalEntry : thbToJpy ? Math.round(totalThb * thbToJpy) : null;
+  // Japan quotations carry the SochicGifts platform fee, worked out from the yen total.
+  const platformFee = orderPlace === 'Japan' && totalJpy !== null ? platformFeeJpy(totalJpy) : null;
+
+  return {
+    values: { cleanItems, priceCurrency, totalThb, originalThb, revenueThb, totalMmk, totalJpy, platformFee, totalPay, thbToJpy, thbToMmk },
+  };
+};
+
+// The fields every save and every edit has to have, checked the same way for both.
+const checkFields = (body, scopeLabel) => {
+  const { customerName, channel } = body;
+  const payCurrency = body.payCurrency || 'THB';
+  // A Japan or Thai admin can only quote for their own country, whatever was sent.
+  const orderPlace = scopeLabel ?? body.orderPlace;
+  if (!customerName || !String(customerName).trim()) return { error: 'customerName is required' };
+  if (!CHANNELS.includes(channel)) return { error: 'Invalid channel' };
+  if (!PLACES.includes(orderPlace)) return { error: 'Invalid order place' };
+  if (!PAY_CURRENCIES.includes(payCurrency)) return { error: 'Invalid customer currency' };
+  return { fields: { customerName: String(customerName).trim(), channel, orderPlace, payCurrency } };
+};
+
 module.exports = async (req, res, [first, second]) => {
   const session = await requireAuth(req, res);
   if (!session) return;
@@ -50,59 +109,20 @@ module.exports = async (req, res, [first, second]) => {
   }
 
   if (first === 'save' && req.method === 'POST') {
-    const { customerName, channel, quoteDate, items } = req.body || {};
-    const payCurrency = (req.body || {}).payCurrency || 'THB';
-    // A Japan or Thai admin can only quote for their own country, whatever was sent.
-    const orderPlace = scopeLabel ?? (req.body || {}).orderPlace;
-    if (!customerName || !customerName.trim()) {
-      return res.status(400).json({ error: 'customerName is required' });
-    }
-    if (!CHANNELS.includes(channel)) return res.status(400).json({ error: 'Invalid channel' });
-    if (!PLACES.includes(orderPlace)) return res.status(400).json({ error: 'Invalid order place' });
-    // Prices are typed in yen for Japan and in baht everywhere else; the browser doesn't choose.
-    const priceCurrency = orderPlace === 'Japan' ? 'JPY' : 'THB';
-    if (!PAY_CURRENCIES.includes(payCurrency)) return res.status(400).json({ error: 'Invalid customer currency' });
+    const body = req.body || {};
+    const checked = checkFields(body, scopeLabel);
+    if (checked.error) return res.status(400).json({ error: checked.error });
+    const { customerName, channel, orderPlace, payCurrency } = checked.fields;
+    const { quoteDate } = body;
 
-    const cleanItems = (Array.isArray(items) ? items : [])
-      .map((i) => ({
-        name: String(i.name || '').trim(),
-        sellingPrice: Number(i.sellingPrice) || 0,
-        originalPrice: Number(i.originalPrice) || 0,
-      }))
-      .filter((i) => i.name);
-    if (cleanItems.length === 0) return res.status(400).json({ error: 'Add at least one item' });
-
-    // All amounts are calculated here, never trusted from the browser. Prices are typed in
-    // priceCurrency (THB or JPY); everything is converted through THB with the Settings rates:
-    //   total   = sum of selling prices (what the customer is quoted)
-    //   revenue = sum of (selling price - original price)
     const settings = await pool.query('SELECT * FROM settings WHERE id = 1');
     const s = settings.rows[0] || {};
-    const thbToJpy = s.rate_thb_to_jpy || null;
-    const thbToMmk = s.rate_thb_to_mmk || null;
-
-    // Which rates this quotation can't do without.
-    const needsJpy = priceCurrency === 'JPY' || payCurrency === 'JPY' || orderPlace === 'Japan';
-    if ((needsJpy && !thbToJpy) || (payCurrency === 'MMK' && !thbToMmk)) {
-      return res.status(400).json({ error: 'Set the exchange rates in Settings first.' });
-    }
-
-    const toThb = (amount, cur) => (cur === 'JPY' ? amount / thbToJpy : amount);
-    const fromThb = (thb, cur) => (cur === 'JPY' ? thb * thbToJpy : cur === 'MMK' ? thb * thbToMmk : thb);
-
-    // Item prices and the total stay in the price currency (THB for Thailand, JPY for Japan). The
-    // currency the customer pays in only adds the total in that currency, shown under the total.
-    const totalEntry = cleanItems.reduce((sum, i) => sum + i.sellingPrice, 0);
-    const originalEntry = cleanItems.reduce((sum, i) => sum + i.originalPrice, 0);
-
-    const totalThb = toThb(totalEntry, priceCurrency);
-    const totalPay = priceCurrency === payCurrency ? totalEntry : Math.round(fromThb(totalThb, payCurrency));
-    const originalThb = toThb(originalEntry, priceCurrency);
-    const revenueThb = totalThb - originalThb;
-    const totalMmk = thbToMmk ? Math.round(totalThb * thbToMmk) : null;
-    const totalJpy = priceCurrency === 'JPY' ? totalEntry : thbToJpy ? Math.round(totalThb * thbToJpy) : null;
-    // Japan quotations carry the SochicGifts platform fee, worked out from the yen total.
-    const platformFee = orderPlace === 'Japan' && totalJpy !== null ? platformFeeJpy(totalJpy) : null;
+    const priced = priceQuote(
+      { items: body.items, payCurrency, orderPlace },
+      { thbToJpy: s.rate_thb_to_jpy || null, thbToMmk: s.rate_thb_to_mmk || null }
+    );
+    if (priced.error) return res.status(400).json({ error: priced.error });
+    const { cleanItems, priceCurrency, totalThb, originalThb, revenueThb, totalMmk, totalJpy, platformFee, totalPay, thbToJpy, thbToMmk } = priced.values;
 
     const client = await pool.connect();
     let row;
@@ -120,7 +140,7 @@ module.exports = async (req, res, [first, second]) => {
                    NULL::integer AS order_id, NULL::text AS order_no`,
         [
           quoteNo,
-          customerName.trim(),
+          customerName,
           channel,
           quoteDate || new Date().toISOString().slice(0, 10),
           orderPlace,
@@ -147,6 +167,51 @@ module.exports = async (req, res, [first, second]) => {
       client.release();
     }
     return res.status(200).json(parse(row));
+  }
+
+  // Edits a saved quotation: everything except its number. The figures are worked out again with the
+  // rates stored on the quotation when it was made (so a later change in Settings doesn't move the
+  // price the customer was quoted), falling back to the current Settings rates for a currency the
+  // quotation never needed before. An order made from it is a separate copy and is not changed.
+  if (first === 'update' && req.method === 'POST') {
+    const body = req.body || {};
+    if (!Number.isInteger(body.id)) return res.status(400).json({ error: 'id must be a number' });
+    const found = await pool.query(
+      `SELECT * FROM quotations WHERE id = $1 AND ($2::text IS NULL OR lower(btrim(order_place)) = $2)`,
+      [body.id, scope]
+    );
+    if (found.rowCount === 0) return res.status(404).json({ error: 'Quotation not found' });
+    const old = found.rows[0];
+
+    // A Japan or Thai admin keeps the quotation in their country.
+    const checked = checkFields({ ...body, orderPlace: scopeLabel ?? body.orderPlace ?? old.order_place }, scopeLabel);
+    if (checked.error) return res.status(400).json({ error: checked.error });
+    const { customerName, channel, orderPlace, payCurrency } = checked.fields;
+
+    const current = (await pool.query('SELECT * FROM settings WHERE id = 1')).rows[0] || {};
+    const priced = priceQuote(
+      { items: body.items, payCurrency, orderPlace },
+      { thbToJpy: old.rate_thb_to_jpy || current.rate_thb_to_jpy || null, thbToMmk: old.rate_thb_to_mmk || current.rate_thb_to_mmk || null }
+    );
+    if (priced.error) return res.status(400).json({ error: priced.error });
+    const v = priced.values;
+
+    const result = await pool.query(
+      `UPDATE quotations SET customer_name = $1, channel = $2, quote_date = COALESCE($3::date, quote_date), order_place = $4, items_json = $5,
+              total_thb = $6, original_thb = $7, revenue_thb = $8, total_mmk = $9, total_jpy = $10, platform_fee_jpy = $11,
+              price_currency = $12, pay_currency = $13, total_pay = $14, rate_thb_to_jpy = $15, rate_thb_to_mmk = $16
+       WHERE id = $17
+       RETURNING id, quote_no, customer_name, channel, to_char(quote_date, 'YYYY-MM-DD') AS quote_date, order_place,
+                 items_json, total_thb, original_thb, revenue_thb, total_mmk, total_jpy, platform_fee_jpy,
+                 price_currency, pay_currency, total_pay, rate_thb_to_jpy, rate_thb_to_mmk`,
+      [
+        customerName, channel, body.quoteDate || null, orderPlace, JSON.stringify(v.cleanItems),
+        v.totalThb, v.originalThb, v.revenueThb, v.totalMmk, v.totalJpy, v.platformFee,
+        v.priceCurrency, payCurrency, v.totalPay, v.thbToJpy, v.thbToMmk, body.id,
+      ]
+    );
+    const order = await pool.query('SELECT id AS order_id, order_no FROM orders WHERE quotation_id = $1', [body.id]);
+    return res.status(200).json(parse({ ...result.rows[0], order_id: order.rows[0]?.order_id ?? null, order_no: order.rows[0]?.order_no ?? null }));
   }
 
   // Changes the currency the customer pays in (the "≈ … MMK" line under the printed total) on a
