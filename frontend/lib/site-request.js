@@ -25,8 +25,7 @@ function cleanAnswers(body) {
   if (!receiverName) return { error: 'receiverName' };
   const senderName = text(b.senderName, 40);
   if (!senderName) return { error: 'senderName' };
-  const contact = text(b.contact, 120);
-  if (!contact) return { error: 'contact' };
+  const contact = text(b.contact, 120); // no longer asked on the form; kept if an older form sends it
   if (!isoDate(b.eventDate)) return { error: 'eventDate' };
   if (!isoDate(b.relationStart)) return { error: 'relationStart' };
 

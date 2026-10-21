@@ -217,7 +217,6 @@ export default function SiteRequests({ onOpenSite }: { onOpenSite?: (siteId: num
                                     <div><dt>For</dt><dd>{a.receiverName}</dd></div>
                                     <div><dt>From</dt><dd>{a.senderName}</dd></div>
                                     <div><dt>Together since</dt><dd>{a.relationStart}</dd></div>
-                                    <div><dt>Contact</dt><dd>{a.contact}</dd></div>
                                     <div><dt>QR password they chose</dt><dd>{a.password || '—'}</dd></div>
                                     <div className="detail-wide"><dt>Love message</dt><dd>{a.loveMessage || 'They asked us to write it'}</dd></div>
                                   </dl>

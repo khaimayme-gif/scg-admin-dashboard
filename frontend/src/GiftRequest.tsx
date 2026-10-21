@@ -12,34 +12,32 @@ const TEXT = {
   my: {
     title: 'သင့်ချစ်သူအတွက် Gift Website',
     intro: 'အောက်ပါအချက်အလက်များကို ဖြည့်ပေးပါ။ သင့်အတွက် အထူး Gift Website လေး ဖန်တီးပေးပြီး QR code ကို ပြန်ပို့ပေးပါမယ် ♡',
-    occasion: 'ဘာအခါသမယအတွက်လဲ',
+    occasion: 'Website လေးကဘာအတွက်လဲ?',
     birthday: 'မွေးနေ့',
-    anniversary: 'နှစ်ပတ်လည်',
+    anniversary: 'Anniversary',
     eventDate: 'Website ကို ဘယ်နေ့မှာ ဖွင့်ကြည့်စေချင်ပါသလဲ',
-    receiverName: 'သူ့နာမည် (ခေါ်ဝေါ်တဲ့ နာမည်)',
-    senderName: 'သင့်နာမည်',
+    receiverName: "သူ့ကိုခေါ်တဲ့ နာမည် (recipient's nickname)",
+    senderName: "သင့်နာမည် (sender's nickname)",
     relationStart: 'ချစ်သူဖြစ်ခဲ့တဲ့ နေ့စွဲ',
     relationHint: 'အတူရှိခဲ့တဲ့ ရက်အရေအတွက် ရေတွက်ပေးမယ့် စာမျက်နှာအတွက် သုံးပါမယ်',
     loveMessage: 'သူ့ကို ပြောချင်တဲ့ စာ / မက်ဆေ့ချ်',
     messagePlaceholder: 'ရင်ထဲက စကားတွေကို ရေးပါ…',
-    writeForMe: 'ကျွန်ုပ်တို့ကို ရေးပေးစေချင်ပါတယ်',
+    writeForMe: 'မင်မင်တို့ကို ရေးပေးစေချင်ပါတယ်',
     photos: 'ဓာတ်ပုံများ',
     photosHint: 'အမှတ်တရ ဓာတ်ပုံ ၃ ပုံ လိုအပ်ပါတယ်',
     memory: 'အမှတ်တရ ဓာတ်ပုံ',
     memDate: 'ရက်စွဲ',
-    memCaption: 'စာတန်းလေး (ဥပမာ - ပထမဆုံး ခရီးသွားခဲ့တဲ့နေ့)',
-    letterPhotos: 'စာအိတ်ထဲက ပုံလေး ၂ ပုံ (မရွေးလည်းရပါတယ်)',
+    memCaption: 'ပုံနဲ့လိုက်ဖတ်တဲ့စာလေး (ဥပမာ - ပထမဆုံး ခရီးသွားခဲ့တဲ့နေ့)',
     couplePhoto: 'နှစ်ယောက်တူ ပုံ (မရွေးလည်းရပါတယ်)',
     pick: 'ဓာတ်ပုံ ရွေးမည်',
     change: 'ပြောင်းမည်',
     uploading: 'တင်နေပါသည်…',
     extras: 'ကိုယ်တိုင် ရေးချင်ပါသလား (မရေးလည်းရပါတယ်)',
-    extrasNote: 'မရေးရင် ကျွန်ုပ်တို့က ချစ်စရာကောင်းတဲ့ စာတွေ ရေးပေးပါမယ်',
+    extrasNote: 'မရေးရင် မင်မင်တို့က ချစ်စရာကောင်းတဲ့ စာတွေ ရေးပေးပါမယ်',
     cakeWishes: 'ကိတ်မုန့်ပေါ်က ဆုတောင်းစာများ (၅ ခုအထိ)',
     reasons: 'သူ့ကို ချစ်ရတဲ့ အကြောင်းရင်းများ (၁၂ ခုအထိ)',
     password: 'QR ကတ်အတွက် လျှို့ဝှက်စကားလုံး (မရွေးလည်းရပါတယ်)',
     passwordHint: 'အင်္ဂလိပ်စာလုံး သို့မဟုတ် ဂဏန်း ၆ လုံးအထက်၊ နေရာလပ်မပါရ',
-    contact: 'ဆက်သွယ်ရန် (Viber / Telegram / ဖုန်းနံပါတ်)',
     submit: 'ပို့မည်',
     sending: 'ပို့နေပါသည်…',
     again: 'ဒီလင့်ခ်ကို အရင်က ဖြည့်ပြီးသားပါ။ ထပ်ပို့ရင် အသစ်ဖြင့် အစားထိုးပါမယ်။',
@@ -52,7 +50,6 @@ const TEXT = {
       loveMessage: 'စာ ရေးပေးပါ၊ သို့မဟုတ် "ရေးပေးစေချင်ပါတယ်" ကို ရွေးပါ။',
       photos: 'အမှတ်တရ ဓာတ်ပုံ ၃ ပုံ လုံးကို တင်ပေးပါ။',
       password: 'လျှို့ဝှက်စကားလုံးမှာ အင်္ဂလိပ်စာလုံး/ဂဏန်း ၆ လုံးအထက် ဖြစ်ရပါမယ်။',
-      contact: 'ဆက်သွယ်ရန် နည်းလမ်း ရေးပေးပါ။',
       busy: 'ဓာတ်ပုံ တင်ပြီးသည်အထိ ခဏစောင့်ပါ။',
       failed: 'ပို့၍ မရပါ။ နောက်မှ ထပ်ကြိုးစားပါ။',
       tooMany: 'ခဏစောင့်ပြီး ပြန်ကြိုးစားပါ။',
@@ -67,7 +64,7 @@ const TEXT = {
   en: {
     title: 'A gift website for your love',
     intro: "Fill in the details below. We'll make a special gift website for you and send the QR code back to you ♡",
-    occasion: 'What is the occasion?',
+    occasion: 'What is the website for?',
     birthday: 'Birthday',
     anniversary: 'Anniversary',
     eventDate: 'On which date should the website open?',
@@ -83,7 +80,6 @@ const TEXT = {
     memory: 'Memory photo',
     memDate: 'Date',
     memCaption: 'A short caption (e.g. Our first trip together)',
-    letterPhotos: '2 small photos for the letter (optional)',
     couplePhoto: 'A photo of the two of you (optional)',
     pick: 'Choose a photo',
     change: 'Change',
@@ -94,7 +90,6 @@ const TEXT = {
     reasons: 'Reasons you love him (up to 12)',
     password: 'A secret password for the QR card (optional)',
     passwordHint: 'At least 6 letters or numbers, no spaces',
-    contact: 'How can we reach you? (Viber / Telegram / phone)',
     submit: 'Send',
     sending: 'Sending…',
     again: 'You already filled this in. Sending again replaces your earlier answers.',
@@ -107,7 +102,6 @@ const TEXT = {
       loveMessage: 'Please write a message, or tick "Please write it for me".',
       photos: 'Please upload all 3 memory photos.',
       password: 'The password needs at least 6 letters or numbers.',
-      contact: 'Please tell us how to reach you.',
       busy: 'Please wait until the photos have finished uploading.',
       failed: 'Could not send. Please try again later.',
       tooMany: 'Please wait a little and try again.',
@@ -227,12 +221,10 @@ export default function GiftRequest() {
   const [loveMessage, setLoveMessage] = useState('');
   const [writeForMe, setWriteForMe] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([emptyMemory(), emptyMemory(), emptyMemory()]);
-  const [letterPhotos, setLetterPhotos] = useState(['', '']);
   const [couplePhoto, setCouplePhoto] = useState('');
   const [cakeWishes, setCakeWishes] = useState<string[]>(['', '', '', '', '']);
   const [reasons, setReasons] = useState<string[]>(Array(12).fill(''));
   const [password, setPassword] = useState('');
-  const [contact, setContact] = useState('');
   const [website, setWebsite] = useState(''); // hidden field, only bots fill it in
   const [busyCount, setBusyCount] = useState(0);
   const [error, setError] = useState('');
@@ -277,7 +269,6 @@ export default function GiftRequest() {
     if (!loveMessage.trim() && !writeForMe) return setError(E.loveMessage);
     if (memories.some((m) => !m.photo)) return setError(E.photos);
     if (password.trim() && !/^[A-Za-z0-9._-]{6,40}$/.test(password.trim())) return setError(E.password);
-    if (!contact.trim()) return setError(E.contact);
     setError('');
     setSending(true);
     try {
@@ -286,7 +277,7 @@ export default function GiftRequest() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           occasion, eventDate, receiverName, senderName, relationStart, loveMessage, writeForMe,
-          memories, letterPhotos, couplePhoto, cakeWishes, reasons, password, contact, website,
+          memories, couplePhoto, cakeWishes, reasons, password, website,
         }),
       });
       if (res.status === 429) setError(E.tooMany);
@@ -370,12 +361,6 @@ export default function GiftRequest() {
                   <input className="survey-input" placeholder={t.memCaption} maxLength={60} value={m.caption} onChange={(e) => setMemory(i, { caption: e.target.value })} />
                 </div>
               ))}
-              <span className="req-memory-title">{t.letterPhotos}</span>
-              <div className="req-pair">
-                {letterPhotos.map((p, i) => (
-                  <PhotoSlot key={i} token={token} lang={lang} value={p} onChange={(url) => setAt(setLetterPhotos, i, url)} onBusy={setBusy} />
-                ))}
-              </div>
               <span className="req-memory-title">{t.couplePhoto}</span>
               <PhotoSlot token={token} lang={lang} value={couplePhoto} onChange={setCouplePhoto} onBusy={setBusy} />
             </fieldset>
@@ -396,9 +381,6 @@ export default function GiftRequest() {
             <label className="survey-label req-gap" htmlFor="req-pw">{t.password}</label>
             <input id="req-pw" className="survey-input" value={password} maxLength={40} autoCapitalize="none" onChange={(e) => setPassword(e.target.value)} />
             <p className="req-hint">{t.passwordHint}</p>
-
-            <label className="survey-label req-gap" htmlFor="req-contact">{t.contact}</label>
-            <input id="req-contact" className="survey-input" value={contact} maxLength={120} onChange={(e) => setContact(e.target.value)} />
 
             <input className="survey-trap" tabIndex={-1} autoComplete="off" aria-hidden="true" value={website} onChange={(e) => setWebsite(e.target.value)} />
 
