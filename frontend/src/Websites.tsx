@@ -567,7 +567,7 @@ function Editor({ start, templates, orders, onClose, onSaved, onCreateQrNote }: 
 
 // ---------------------------------------------------------------- the page
 
-export default function Websites({ onCreateQrNote }: { onCreateQrNote?: (intent: QrNoteIntent) => void }) {
+export default function Websites({ onCreateQrNote, openSiteId = null, onOpened }: { onCreateQrNote?: (intent: QrNoteIntent) => void; openSiteId?: number | null; onOpened?: () => void }) {
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [templates, setTemplates] = useState<TemplateInfo[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -601,6 +601,14 @@ export default function Websites({ onCreateQrNote }: { onCreateQrNote?: (intent:
   useEffect(() => {
     load();
   }, []);
+
+  // Arriving from Website Requests with a site to edit: open its editor straight away.
+  useEffect(() => {
+    if (openSiteId === null) return;
+    openSite({ id: openSiteId } as SiteRow);
+    onOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSiteId]);
 
   const nameOf = (file: string) => templates.find((t) => t.file === file)?.name ?? file;
 

@@ -253,6 +253,10 @@ The role is enforced in the API (`lib/auth.js`, `lib/routes/*`), not just hidden
 
 To add a template, add the artwork (with the editable text removed) to `src/assets/` and a new entry in `LOVE_NOTE_TEMPLATES` with the pixel positions of the date, greeting, message and name. A sharper copy of the same artwork can replace the file: set `width`/`height` to its pixel size and scale the positions to match.
 
+## Website Requests (customers fill in their own gift website)
+
+**Digital Gifts → Website Requests** makes a private link per order (`/request/<token>`). The customer opens it (no login), fills in a Burmese/English form (occasion and date, names, the date they got together, a love message, 3 memory photos with date and caption, optional letter/couple photos, optional cake wishes and reasons, an optional QR password and a contact) and uploads their photos straight to Supabase Storage (`requests/`). The answers show in the admin; **Make website** turns them into a draft website from the **Especially For Him** template (not published, opens on the date they chose), and opens it in Websites to check and publish. Anything the customer leaves blank keeps the template's own wording. The link stops working once the website is made. Each link allows 20 photo uploads and 30 submissions.
+
 ## Websites (gift websites from templates)
 
 **Websites** in the sidebar makes a customer's gift website from one of the website's templates (`sochicgifts/templates/*.html`). The templates are only ever *read*: each customer's site is a row in `gift_sites` holding just the values that were changed, so the original can never be touched.

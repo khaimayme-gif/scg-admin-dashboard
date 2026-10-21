@@ -333,6 +333,26 @@ function ensureSchema() {
       )`))
     .then(() => pool.query(`
       CREATE INDEX IF NOT EXISTS gift_sites_template ON gift_sites (template)`))
+    // Website requests: a private link per order where the customer says what they want on their gift
+    // website. The answers (and the photos they uploaded, kept in Supabase Storage) wait here until the
+    // admin turns them into a draft website.
+    .then(() => pool.query(`
+      CREATE TABLE IF NOT EXISTS site_requests (
+        id SERIAL PRIMARY KEY,
+        token TEXT NOT NULL UNIQUE,
+        order_id INTEGER,
+        order_no TEXT,
+        customer_name TEXT NOT NULL,
+        country TEXT,
+        status TEXT NOT NULL DEFAULT 'waiting',
+        answers_json TEXT,
+        uploads INTEGER NOT NULL DEFAULT 0,
+        submissions INTEGER NOT NULL DEFAULT 0,
+        site_id INTEGER,
+        created_by TEXT NOT NULL DEFAULT 'superadmin',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        submitted_at TIMESTAMPTZ
+      )`))
     // QR love notes: a printed card carries the same QR for everyone, which opens a password page.
     // The password written on the card finds the note, and the note says which customer page to open
     // and when it is available.
