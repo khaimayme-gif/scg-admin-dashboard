@@ -81,7 +81,7 @@ module.exports = async (req, res, [first, second]) => {
     const values = buildSiteValues(a, fields);
 
     const from = new Date(`${a.eventDate}T00:00:00+07:00`);
-    const note = [`Request from ${request.customer_name}`, `Contact: ${a.contact}`, a.password ? `QR password they chose: ${a.password}` : 'No QR password chosen',
+    const note = [`Request from ${request.customer_name}`, a.contact ? `Contact: ${a.contact}` : '', a.password ? `QR password they chose: ${a.password}` : 'No QR password chosen',
       a.writeForMe ? 'Asked us to write the love message' : ''].filter(Boolean).join('\n');
     const slug = await freeSlug(a.receiverName);
     const site = await pool.query(
