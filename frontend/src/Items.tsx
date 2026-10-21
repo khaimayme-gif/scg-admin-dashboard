@@ -365,10 +365,6 @@ export default function Items({ country }: { country: Country }) {
   const [types, setTypes] = useState<ItemType[]>([]);
   const [showTypes, setShowTypes] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  // Thailand menu book import: offered to the super admin until it has been done once.
-  const [menuBook, setMenuBook] = useState<{ imported: boolean; thailandItems: number; bookItems: number } | null>(null);
-  const [menuBookBusy, setMenuBookBusy] = useState(false);
-  const [menuBookNote, setMenuBookNote] = useState('');
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -387,40 +383,30 @@ export default function Items({ country }: { country: Country }) {
       .then((data) => setTypes(Array.isArray(data) ? data : []))
       .catch(() => {});
 
-  const loadMenuBook = () => {
-    if (country !== 'thailand' || !isSuperAdmin) return;
-    apiFetch('/items/menu-book')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setMenuBook(data))
-      .catch(() => {});
-  };
-
   useEffect(() => {
     loadItems();
     loadTypes();
-    loadMenuBook();
   }, []);
 
-  const importMenuBook = async () => {
-    if (!menuBook) return;
-    const ok = window.confirm(
-      `Replace all ${menuBook.thailandItems} Thailand items with the ${menuBook.bookItems} items from the menu book (with their photos and prices)?\n\n` +
-      'The current Thailand items will be deleted. Japan items are not touched. This cannot be undone.'
-    );
-    if (!ok) return;
-    setMenuBookBusy(true);
-    setMenuBookNote('');
+  // Wipes this country's whole catalog (photos included) to free database space. Asks twice.
+  const [clearing, setClearing] = useState(false);
+  const [clearNote, setClearNote] = useState('');
+  const clearAll = async () => {
+    if (!window.confirm(`Delete ALL ${items.length} ${money.label} items, with their photos and prices?\n\nThey also disappear from the website menu. This cannot be undone.`)) return;
+    const typed = window.prompt(`Type DELETE to permanently delete all ${money.label} items.`);
+    if (typed !== 'DELETE') return;
+    setClearing(true);
+    setClearNote('');
     try {
-      const res = await apiFetch('/items/menu-book', { method: 'POST' });
+      const res = await apiFetch('/items/clear', jsonBody({ country, confirm: 'DELETE' }));
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Import failed');
-      setMenuBookNote(`Done: removed ${data.removed} old items and imported ${data.imported} from the menu book.`);
-      await Promise.all([loadItems(), loadTypes()]);
-      loadMenuBook();
+      if (!res.ok) throw new Error(data.error || 'Could not delete the items');
+      setClearNote(`Deleted ${data.removed} items.${data.compacted ? ' The database space was freed.' : ''}`);
+      await loadItems();
     } catch (err) {
-      setMenuBookNote(err instanceof Error ? err.message : 'Import failed');
+      setClearNote(err instanceof Error ? err.message : 'Could not delete the items');
     } finally {
-      setMenuBookBusy(false);
+      setClearing(false);
     }
   };
 
@@ -543,9 +529,9 @@ export default function Items({ country }: { country: Country }) {
           </p>
         </div>
         <div className="header-actions">
-          {menuBook && !menuBook.imported && (
-            <button className="header-secondary-btn" onClick={importMenuBook} disabled={menuBookBusy}>
-              {menuBookBusy ? 'Importing menu book…' : 'Import menu book'}
+          {isSuperAdmin && items.length > 0 && (
+            <button className="header-secondary-btn" onClick={clearAll} disabled={clearing}>
+              {clearing ? 'Deleting…' : 'Delete all items'}
             </button>
           )}
           <button className="header-secondary-btn" onClick={() => setShowImport(true)}>Import</button>
@@ -554,7 +540,7 @@ export default function Items({ country }: { country: Country }) {
         </div>
       </header>
 
-      {menuBookNote && <p className="order-profit">{menuBookNote}</p>}
+      {clearNote && <p className="order-profit">{clearNote}</p>}
 
       {loading ? (
         <p className="empty-state">Loading…</p>
