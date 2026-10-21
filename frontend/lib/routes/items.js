@@ -126,63 +126,24 @@ module.exports = async (req, res, [first, second]) => {
     }
   }
 
-  // The Thailand menu book (lib/menu-book-seed.js). GET says whether it has been imported;
-  // POST replaces the whole Thailand catalog with it (the super admin confirms first in the UI).
-  if (first === 'menu-book' && req.method === 'GET') {
+  // Deletes every item (and its photo) of one country's catalog. Super admin only, and the browser
+  // has to send confirm: 'DELETE' so a stray request can't wipe a catalog. Item types are kept. The
+  // table is compacted afterwards (best effort) so the photos' space is handed back to the database.
+  if (first === 'clear' && req.method === 'POST') {
     if (!await requireSuper(req, res)) return;
+    const { country, confirm } = req.body || {};
+    if (!COUNTRIES.includes(country)) return res.status(400).json({ error: 'country must be thailand or japan' });
+    if (confirm !== 'DELETE') return res.status(400).json({ error: 'Type DELETE to confirm' });
     await ensureSchema();
-    const [flag, count] = await Promise.all([
-      pool.query("SELECT 1 FROM schema_flags WHERE name = 'menu_book_thailand_imported'"),
-      pool.query("SELECT COUNT(*)::int AS n FROM items WHERE country = 'thailand'"),
-    ]);
-    const seed = require('../menu-book-seed');
-    return res.status(200).json({ imported: flag.rowCount > 0, thailandItems: count.rows[0].n, bookItems: seed.items.length });
-  }
-
-  if (first === 'menu-book' && req.method === 'POST') {
-    if (!await requireSuper(req, res)) return;
-    await ensureSchema();
-    const seed = require('../menu-book-seed'); // big (photos), so only loaded here
-    const client = await pool.connect();
+    const removed = await pool.query('DELETE FROM items WHERE country = $1', [country]);
+    let compacted = false;
     try {
-      await client.query('BEGIN');
-      // Item types: reuse a type with the same code (keeping its name, which other catalogs may
-      // use), else create it; then number them in the book's order.
-      const typeName = {};
-      for (const [i, t] of seed.types.entries()) {
-        let row = await client.query('SELECT name FROM item_types WHERE code = $1', [t.code]);
-        if (!row.rowCount) {
-          await client.query('INSERT INTO item_types (name, code) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING', [t.name, t.code]);
-          row = await client.query('SELECT name FROM item_types WHERE code = $1 OR name = $2 ORDER BY (code = $1) DESC LIMIT 1', [t.code, t.name]);
-        }
-        typeName[t.code] = row.rows[0].name;
-        await client.query('UPDATE item_types SET sort_order = $1 WHERE name = $2', [i + 1, typeName[t.code]]);
-      }
-      const removed = await client.query("DELETE FROM items WHERE country = 'thailand'");
-      // One INSERT for every item: a round trip per item adds up when the database is far away.
-      const cols = { category: [], name: [], price: [], code: [], desc: [], group: [], data: [], mime: [] };
-      for (const it of seed.items) {
-        const m = it.photo && /^data:(image\/jpeg);base64,(.+)$/.exec(it.photo);
-        cols.category.push(typeName[it.type]); cols.name.push(it.name); cols.price.push(it.price);
-        cols.code.push(it.code); cols.desc.push(it.description); cols.group.push(it.group);
-        cols.data.push(m ? m[2] : null); cols.mime.push(m ? m[1] : null);
-      }
-      await client.query(
-        `INSERT INTO items (category, name, menu_price, item_code, description, item_group, photo_data, photo_mime, published, country)
-         SELECT c, n, p, code, d, g, pd, pm, TRUE, 'thailand'
-         FROM unnest($1::text[], $2::text[], $3::real[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[])
-           AS x(c, n, p, code, d, g, pd, pm)`,
-        [cols.category, cols.name, cols.price, cols.code, cols.desc, cols.group, cols.data, cols.mime]
-      );
-      await client.query("INSERT INTO schema_flags (name) VALUES ('menu_book_thailand_imported') ON CONFLICT DO NOTHING");
-      await client.query('COMMIT');
-      return res.status(200).json({ removed: removed.rowCount, imported: seed.items.length });
-    } catch (err) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw err;
-    } finally {
-      client.release();
+      await pool.query('VACUUM FULL items');
+      compacted = true;
+    } catch {
+      // The rows are gone either way; the database will reuse the space on its own.
     }
+    return res.status(200).json({ removed: removed.rowCount, compacted });
   }
 
   if (first === 'save' && req.method === 'POST') {
