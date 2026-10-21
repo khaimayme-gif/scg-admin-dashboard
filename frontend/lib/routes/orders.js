@@ -14,7 +14,7 @@ const CHANNELS = ['tiktok', 'facebook'];
 const ORDER_COLUMNS = `id, order_no, quotation_id, customer_name, country, channel,
   to_char(order_date, 'YYYY-MM-DD') AS order_date, status, currency, selling_price, cost, revenue,
   items_json, notes, recipient, recipient_phone, to_char(delivery_date, 'YYYY-MM-DD') AS delivery_date,
-  delivery_address, delivery_note, board_stage, platform_fee_jpy`;
+  delivery_address, delivery_note, board_stage, platform_fee_jpy, amount_paid`;
 
 const parse = (row) => ({ ...row, items: JSON.parse(row.items_json) });
 
@@ -148,7 +148,7 @@ module.exports = async (req, res, [first, second]) => {
   if (first === 'save' && req.method === 'POST') {
     const {
       id, customerName, country, channel, orderDate, status, currency, sellingPrice, items, notes,
-      recipient, recipientPhone, deliveryDate, deliveryAddress, deliveryNote, quotationId,
+      recipient, recipientPhone, deliveryDate, deliveryAddress, deliveryNote, quotationId, amountPaid,
     } = req.body || {};
     // A Japan or Thai admin can only work with their own country's orders: the country is fixed, whatever was sent.
     const orderCountry = scopeLabel ?? country;
@@ -160,6 +160,20 @@ module.exports = async (req, res, [first, second]) => {
     if (!CURRENCIES.includes(currency)) return res.status(400).json({ error: 'Invalid currency' });
     if (deliveryDate && !isIsoDate(deliveryDate)) {
       return res.status(400).json({ error: 'deliveryDate must be YYYY-MM-DD' });
+    }
+
+    // A partially paid order remembers how much has been paid; the rest is what is still owed. It is
+    // only kept while the status is partially_paid.
+    let paid = null;
+    if (status === 'partially_paid') {
+      paid = Number(amountPaid);
+      const total = Number(sellingPrice || 0);
+      if (!Number.isFinite(paid) || paid <= 0) {
+        return res.status(400).json({ error: 'Enter how much the customer has paid so far.' });
+      }
+      if (!(total > 0) || paid >= total) {
+        return res.status(400).json({ error: 'The amount paid must be less than the order total. If it is all paid, choose Paid.' });
+      }
     }
 
     // Cost and revenue are always calculated here, never trusted from the browser:
@@ -214,10 +228,10 @@ module.exports = async (req, res, [first, second]) => {
         `UPDATE orders SET customer_name = $1, country = $2, channel = $3, order_date = $4, status = $5,
            currency = $6, selling_price = $7, cost = $8, revenue = $9, items_json = $10, notes = $11,
            recipient = $12, recipient_phone = $13, delivery_date = $14, delivery_address = $15, delivery_note = $16,
-           platform_fee_jpy = $19, updated_at = NOW()
+           platform_fee_jpy = $19, amount_paid = $20, updated_at = NOW()
          WHERE id = $17 AND ($18::text IS NULL OR lower(btrim(country)) = $18)
          RETURNING ${ORDER_COLUMNS}`,
-        [...values, id, scope, feeJpy]
+        [...values, id, scope, feeJpy, paid]
       );
       if (result.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
       return res.status(200).json(parse(result.rows[0]));
@@ -260,10 +274,10 @@ module.exports = async (req, res, [first, second]) => {
         `INSERT INTO orders (customer_name, country, channel, order_date, status, currency,
                              selling_price, cost, revenue, items_json, notes,
                              recipient, recipient_phone, delivery_date, delivery_address, delivery_note,
-                             order_no, quotation_id, platform_fee_jpy)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+                             order_no, quotation_id, platform_fee_jpy, amount_paid)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
          RETURNING ${ORDER_COLUMNS}`,
-        [...values, orderNo, linkedQuotation, feeJpy]
+        [...values, orderNo, linkedQuotation, feeJpy, paid]
       );
       await client.query('COMMIT');
       return res.status(200).json(parse(result.rows[0]));

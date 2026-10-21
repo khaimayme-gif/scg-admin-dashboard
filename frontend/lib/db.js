@@ -242,6 +242,9 @@ function ensureSchema() {
     `)).then(() => pool.query(`
       CREATE INDEX IF NOT EXISTS expenses_expense_date ON expenses (expense_date DESC)
     `))
+    // How much of a partially paid order the customer has paid so far (in the order's currency). The
+    // amount still to pay is the selling price minus this. Only set while the status is partially_paid.
+    .then(() => pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS amount_paid REAL`))
     // So Chic Board: every order is a ticket in one of todo / in_progress / done / closed.
     // `status` on an order now only says how much has been paid (pending = unpaid,
     // partially_paid, paid); delivery progress lives in board_stage.

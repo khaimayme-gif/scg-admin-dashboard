@@ -30,6 +30,7 @@ export interface OrderImageData {
   currency: string;
   paymentLabel: string; // e.g. "fully paid"
   paymentTone: 'paid' | 'pending' | 'cancelled';
+  paid?: number | null; // partially paid orders: what has been paid so far; the rest is shown as still to pay
 }
 
 const FONT = "'Inter', 'Noto Sans Thai', 'Noto Sans Myanmar', sans-serif";
@@ -232,6 +233,18 @@ const layout = (data: OrderImageData, bow: HTMLImageElement): Draw => (ctx, pain
     ctx.fill();
     ctx.fillStyle = pill.fg;
     text(data.paymentLabel, TEXT_R - 8, y, 'right', `500 25px ${FONT}`);
+    ctx.fillStyle = GRAY;
+  }
+
+  // A partially paid order shows what has been paid and what is still to pay.
+  if (data.paid && data.paid > 0 && data.paid < data.total) {
+    y += ROW_PITCH - 6;
+    text('Paid so far', TEXT_L, y, 'left', rowFont);
+    text(money(data.paid, data.currency), TEXT_R, y, 'right', rowFontStrong);
+    y += ROW_PITCH - 6;
+    ctx.fillStyle = '#c4566b';
+    text('Still to pay', TEXT_L, y, 'left', `600 ${ROW_SIZE}px ${FONT}`);
+    text(money(data.total - data.paid, data.currency), TEXT_R, y, 'right', `700 ${ROW_SIZE}px ${FONT}`);
     ctx.fillStyle = GRAY;
   }
 
