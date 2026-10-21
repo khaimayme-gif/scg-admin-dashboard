@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/survey", "destination": "/index.html" },
+    { "source": "/request/:token", "destination": "/index.html" },
     { "source": "/api/(.*)", "destination": "/api/index?apiPath=$1" }
   ]
 }

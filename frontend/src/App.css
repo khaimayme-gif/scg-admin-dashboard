@@ -1364,3 +1364,29 @@ body {
   .love-note-layout { grid-template-columns: minmax(0, 1fr); }
   .love-note-preview { position: static; }
 }
+
+/* Gift-website request form (public page /request/<token>) */
+.req-card { max-width: 520px; }
+.req-lang { display: flex; justify-content: center; gap: 6px; margin-bottom: 14px; }
+.req-lang button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 14px; font-family: inherit; font-size: 13px; color: var(--muted); cursor: pointer; }
+.req-lang button.is-on { background: var(--pink); border-color: var(--pink); color: #fff; }
+.req-gap { margin-top: 22px; display: block; }
+.req-hint { margin: 2px 0 6px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+.req-note { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: #FFF8E8; font-size: 13px; line-height: 1.7; color: #7A5B12; }
+.req-check { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 14px; line-height: 1.6; cursor: pointer; }
+.req-check input { width: 20px; height: 20px; accent-color: var(--pink); flex-shrink: 0; }
+.req-memory { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin: 10px 0 12px; display: grid; gap: 8px; }
+.req-memory-title { display: block; margin: 14px 0 6px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.req-memory .req-memory-title { margin: 0; }
+.req-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.req-photo { display: grid; gap: 8px; justify-items: start; }
+.req-photo img, .req-photo-empty { width: 100%; max-width: 150px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 12px; background: var(--blush); }
+.req-photo-empty { display: grid; place-items: center; font-size: 32px; }
+.req-photo-btn { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px 14px; font-family: inherit; font-size: 14px; cursor: pointer; }
+.req-photo-btn:disabled { opacity: 0.6; }
+.req-line { margin-bottom: 8px; }
+.req-error { margin: 12px 0 0; font-size: 14px; line-height: 1.7; color: #B4344C; }
+.req-submit { width: 100%; margin-top: 18px; padding: 14px; border: none; border-radius: 12px; background: var(--pink); color: #fff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
+.req-submit:disabled { opacity: 0.6; cursor: default; }
+.req-admin-photos { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.req-admin-photos img { width: 72px; height: 90px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }

@@ -17,6 +17,7 @@ import QrNotes from './QrNotes';
 import LoveNotes from './LoveNotes';
 import type { QrNoteIntent } from './QrNotes';
 import Websites from './Websites';
+import SiteRequests from './SiteRequests';
 import { RoleContext, ROLE_PAGES, ROLE_HOME, isRole } from './role';
 import type { Role } from './role';
 import SochicBoard from './SochicBoard';
@@ -29,6 +30,8 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [role, setRole] = useState<Role>('superadmin');
   const [username, setUsername] = useState('');
+  // A website to open in the Websites editor, set when a request was just turned into a website.
+  const [openSiteId, setOpenSiteId] = useState<number | null>(null);
   const [canChangePassword, setCanChangePassword] = useState(true);
   // "Make Order" on a quotation hands it to the Orders page, which opens the prefilled form.
   const [menuOpen, setMenuOpen] = useState(false);
@@ -130,7 +133,8 @@ export default function App() {
         )}
         {page === 'feedback' && <Feedback />}
         {page === 'qrnotes' && <QrNotes intent={qrNoteIntent} onIntentHandled={() => setQrNoteIntent(null)} />}
-        {page === 'websites' && <Websites onCreateQrNote={(intent) => { setQrNoteIntent(intent); setActive('qrnotes'); }} />}
+        {page === 'siterequests' && <SiteRequests onOpenSite={(id) => { setOpenSiteId(id); setActive('websites'); }} />}
+        {page === 'websites' && <Websites openSiteId={openSiteId} onOpened={() => setOpenSiteId(null)} onCreateQrNote={(intent) => { setQrNoteIntent(intent); setActive('qrnotes'); }} />}
         {page === 'quotation' && <Quotation onMakeOrder={handleMakeOrder} />} 
         {page === 'qr' && <QRCodeGenerator />}
         {page === 'lovenotes' && <LoveNotes />}

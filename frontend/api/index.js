@@ -27,6 +27,7 @@ const ROUTES = {
   'item-types': require('../lib/routes/item-types'),
   sites: require('../lib/routes/sites'),
   'qr-notes': require('../lib/routes/qr-notes'),
+  'site-requests': require('../lib/routes/site-requests'),
   survey: require('../lib/routes/survey'),
   users: require('../lib/routes/users'),
   dashboard: require('../lib/routes/dashboard'),

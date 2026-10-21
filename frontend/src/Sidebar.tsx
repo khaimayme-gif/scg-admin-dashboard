@@ -37,6 +37,7 @@ const MODULES: Module[] = [
     children: [
       { id: 'templates', label: 'Template Library' },
       { id: 'qrnotes', label: 'QR Love Notes' },
+      { id: 'siterequests', label: 'Website Requests' },
       { id: 'websites', label: 'Websites' },
     ],
   },

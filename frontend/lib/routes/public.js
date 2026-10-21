@@ -32,7 +32,7 @@ p{margin:0 0 6px;line-height:1.9;font-size:15px}.en{font-family:'Inter',sans-ser
 <body><div class="c"><img src="${LANDING_URL}/images/main/main-logo.png" alt="So Chic Gifts"><p>${text[0]}</p><p class="en">${text[1]}</p><div class="f">made with love by sochicgifts</div></div></body></html>`;
 }
 
-module.exports = async (req, res, [first, second]) => {
+module.exports = async (req, res, [first, second, third]) => {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
@@ -112,6 +112,55 @@ module.exports = async (req, res, [first, second]) => {
       [name, country, body.delivery, rating, feedback || null, ipHash]
     );
     return res.status(200).json({ ok: true });
+  }
+
+  // The gift-website request form (public, one private link per order: /request/<token> in the admin app).
+  //   GET  /api/public/request/:token             -> { status: waiting | submitted | closed }
+  //   POST /api/public/request/:token/upload-url  -> a signed upload for one photo { uploadUrl, publicUrl }
+  //   POST /api/public/request/:token             -> saves the customer's answers
+  // The token is the only key, so a wrong one answers 404 and the number of uploads and answers per
+  // link is capped.
+  if (first === 'request' && second) {
+    const token = String(second);
+    if (!/^[A-Za-z0-9_-]{10,60}$/.test(token)) return res.status(404).json({ error: 'not_found' });
+    await ensureSchema();
+    const found = await pool.query('SELECT id, status, submissions FROM site_requests WHERE token = $1', [token]);
+    const row = found.rows[0];
+    if (!row) return res.status(404).json({ error: 'not_found' });
+
+    if (req.method === 'GET' && !third) {
+      return res.status(200).json({ status: row.status === 'site_made' ? 'closed' : row.status });
+    }
+    if (req.method === 'POST' && row.status === 'site_made') return res.status(409).json({ error: 'closed' });
+
+    if (req.method === 'POST' && third === 'upload-url') {
+      const { SUPABASE_URL, BUCKET, signUpload } = require('../storage');
+      if (!SUPABASE_URL) return res.status(503).json({ error: 'uploads_unavailable' });
+      const { fileName, contentType, size } = req.body || {};
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) return res.status(400).json({ error: 'type' });
+      if (!Number.isFinite(size) || size <= 0 || size > 12 * 1024 * 1024) return res.status(400).json({ error: 'size' });
+      // 20 photos per link is plenty for 3 memories, 2 letter photos and a couple of retries.
+      const slot = await pool.query('UPDATE site_requests SET uploads = uploads + 1 WHERE id = $1 AND uploads < 20 RETURNING uploads', [row.id]);
+      if (slot.rowCount === 0) return res.status(429).json({ error: 'too_many' });
+      const signed = await signUpload(`requests/${token.slice(0, 12)}`, fileName, contentType);
+      if (!signed) return res.status(502).json({ error: 'upload_failed' });
+      return res.status(200).json(signed);
+    }
+
+    if (req.method === 'POST' && !third) {
+      const body = req.body || {};
+      if (body.website) return res.status(200).json({ ok: true }); // hidden field only bots fill in
+      if (row.submissions >= 30) return res.status(429).json({ error: 'too_many' });
+      const { cleanAnswers } = require('../site-request');
+      const checked = cleanAnswers(body);
+      if (checked.error) return res.status(400).json({ error: checked.error });
+      await pool.query(
+        `UPDATE site_requests SET answers_json = $1, status = 'submitted', submitted_at = NOW(), submissions = submissions + 1 WHERE id = $2`,
+        [JSON.stringify(checked.answers), row.id]
+      );
+      return res.status(200).json({ ok: true });
+    }
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
