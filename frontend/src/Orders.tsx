@@ -34,6 +34,7 @@ interface Order {
   delivery_address: string | null;
   delivery_note: string | null;
   platform_fee_jpy: number | null; // Japan orders only
+  amount_paid: number | null; // partially paid orders: how much has been paid so far
 }
 
 // What the Quotation page hands over when the admin clicks "Make Order".
@@ -109,6 +110,7 @@ interface FormState {
   deliveryDate: string;
   deliveryAddress: string;
   deliveryNote: string;
+  amountPaid: string; // partially paid only
 }
 
 // Payment status only. Where an order is in its delivery journey lives on So Chic Board.
@@ -200,6 +202,7 @@ const emptyForm = (): FormState => ({
   deliveryDate: '',
   deliveryAddress: '',
   deliveryNote: '',
+  amountPaid: '',
 });
 
 const formFromOrder = (order: Order): FormState => ({
@@ -230,6 +233,7 @@ const formFromOrder = (order: Order): FormState => ({
   deliveryDate: order.delivery_date ?? '',
   deliveryAddress: order.delivery_address ?? '',
   deliveryNote: order.delivery_note ?? '',
+  amountPaid: order.amount_paid ? String(order.amount_paid) : '',
 });
 
 // Turns a quotation into a new, unsaved order. The customer has paid by the time this runs,
@@ -286,6 +290,8 @@ const imageDataFor = (o: Order) => {
     currency: o.currency,
     paymentLabel: payment.label,
     paymentTone: payment.tone,
+    // Partially paid orders show what has been paid and what is still to pay.
+    paid: o.status === 'partially_paid' && o.amount_paid ? o.amount_paid : null,
   };
 };
 
@@ -465,6 +471,18 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
       setFormError('Customer name and country are required.');
       return;
     }
+    if (form.status === 'partially_paid') {
+      const paid = Number(form.amountPaid);
+      const total = Number(form.sellingPrice || 0);
+      if (!(paid > 0)) {
+        setFormError('Enter how much the customer has paid so far.');
+        return;
+      }
+      if (!(total > 0) || paid >= total) {
+        setFormError('The amount paid must be less than the order total. If it is all paid, choose Paid.');
+        return;
+      }
+    }
     setFormError('');
     setSaving(true);
     let saved: Order;
@@ -494,6 +512,7 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
         deliveryDate: form.deliveryDate || null,
         deliveryAddress: form.deliveryAddress,
         deliveryNote: form.deliveryNote,
+        amountPaid: form.status === 'partially_paid' ? Number(form.amountPaid) || 0 : undefined,
       }));
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -687,6 +706,24 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                   ))}
                 </select>
               </div>
+              {form.status === 'partially_paid' && (
+                <div className="order-field">
+                  <label>Paid so far ({form.currency})</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="item-input"
+                    placeholder="Amount the customer has paid"
+                    value={form.amountPaid}
+                    onChange={(e) => update('amountPaid', e.target.value)}
+                  />
+                  <span className="cell-sub">
+                    {Number(form.amountPaid) > 0 && Number(form.sellingPrice) > Number(form.amountPaid)
+                      ? `Still to pay: ${fmt(Number(form.sellingPrice) - Number(form.amountPaid))} ${form.currency}`
+                      : 'The rest of the total is what is still to pay.'}
+                  </span>
+                </div>
+              )}
             </div>
 
             <h3 className="order-subheading">Delivery</h3>
@@ -989,6 +1026,12 @@ export default function Orders({ intent = null, onIntentHandled }: OrdersProps) 
                                       <div><dt>Platform fee</dt><dd className="items-price-cell">{fmt(o.platform_fee_jpy)} Yen</dd></div>
                                     )}
                                     <div><dt>Selling price</dt><dd className="items-price-cell">{fmt(o.selling_price)} {o.currency}</dd></div>
+                                    {o.status === 'partially_paid' && o.amount_paid ? (
+                                      <>
+                                        <div><dt>Paid so far</dt><dd className="items-price-cell">{fmt(o.amount_paid)} {o.currency}</dd></div>
+                                        <div><dt>Still to pay</dt><dd className="items-price-cell">{fmt(Math.max(0, o.selling_price - o.amount_paid))} {o.currency}</dd></div>
+                                      </>
+                                    ) : null}
                                     <div><dt>Cost</dt><dd className="items-price-cell">{fmt(o.cost)} {o.currency}</dd></div>
                                     <div><dt>Recipient</dt><dd>{o.recipient || '—'}{o.recipient_phone ? ` · ${o.recipient_phone}` : ''}</dd></div>
                                     <div><dt>Delivery date</dt><dd>{o.delivery_date || '—'}</dd></div>
