@@ -151,12 +151,19 @@ function putFile(url: string, file: File) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
-    xhr.setRequestHeader('Content-Type', file.type);
     xhr.setRequestHeader('x-upsert', 'false');
-    xhr.setRequestHeader('cache-control', 'max-age=31536000');
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`put ${xhr.status}`)));
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) return resolve();
+      let why = '';
+      try { why = String(JSON.parse(xhr.responseText).message || ''); } catch { /* not JSON */ }
+      reject(new Error(`put ${xhr.status}${why ? ' ' + why.slice(0, 60) : ''}`));
+    };
     xhr.onerror = () => reject(new Error('put network'));
-    xhr.send(file);
+    // Same multipart body the Supabase client sends for a signed upload.
+    const body = new FormData();
+    body.append('cacheControl', '31536000');
+    body.append('', file);
+    xhr.send(body);
   });
 }
 
