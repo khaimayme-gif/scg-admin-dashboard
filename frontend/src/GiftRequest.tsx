@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import logo from './assets/sochic-logo-pink.png';
 
 // The gift-website request form. Public page at /request/<token> (no login), opened from a private link
-// the admin makes for one order. The customer says what they want on their gift website and uploads
-// their photos; the admin turns the answers into a draft website.
+// the admin makes for one order. The customer says what they want on their gift website; the
+// admin turns the answers into a draft website.
 //
 // The form is in Burmese and English (switch at the top). All the wording is in TEXT below.
 type Lang = 'my' | 'en';
@@ -24,14 +24,10 @@ const TEXT = {
     messagePlaceholder: 'ရင်ထဲက စကားတွေကို ရေးပါ…',
     writeForMe: 'မင်မင်တို့ကို ရေးပေးစေချင်ပါတယ်',
     photos: 'ဓာတ်ပုံများ',
-    photosHint: 'အမှတ်တရ ဓာတ်ပုံ ၃ ပုံအထိ တင်နိုင်ပါတယ် (မတင်လည်းရပါတယ်)',
-    memory: 'အမှတ်တရ ဓာတ်ပုံ',
+    photosHint: 'ဓာတ်ပုံများကို chat ထဲမှာ ပို့ပေးပါ။',
+    memory: 'အမှတ်တရ',
     memDate: 'ရက်စွဲ',
     memCaption: 'ပုံနဲ့လိုက်ဖတ်တဲ့စာလေး (ဥပမာ - ပထမဆုံး ခရီးသွားခဲ့တဲ့နေ့)',
-    couplePhoto: 'နှစ်ယောက်တူ ပုံ (မရွေးလည်းရပါတယ်)',
-    pick: 'ဓာတ်ပုံ ရွေးမည်',
-    change: 'ပြောင်းမည်',
-    uploading: 'တင်နေပါသည်…',
     extras: 'ကိုယ်တိုင် ရေးချင်ပါသလား (မရေးလည်းရပါတယ်)',
     extrasNote: 'မရေးရင် မင်မင်တို့က ချစ်စရာကောင်းတဲ့ စာတွေ ရေးပေးပါမယ်',
     cakeWishes: 'ကိတ်မုန့်ပေါ်က ဆုတောင်းစာများ (၅ ခုအထိ)',
@@ -48,12 +44,9 @@ const TEXT = {
       senderName: 'သင့်နာမည် ရေးပေးပါ။',
       relationStart: 'ချစ်သူဖြစ်ခဲ့တဲ့ နေ့စွဲကို ရွေးပေးပါ။',
       loveMessage: 'စာ ရေးပေးပါ၊ သို့မဟုတ် "ရေးပေးစေချင်ပါတယ်" ကို ရွေးပါ။',
-      photos: 'အမှတ်တရ ဓာတ်ပုံ ၃ ပုံ လုံးကို တင်ပေးပါ။',
       password: 'လျှို့ဝှက်စကားလုံးမှာ အင်္ဂလိပ်စာလုံး/ဂဏန်း ၆ လုံးအထက် ဖြစ်ရပါမယ်။',
-      busy: 'ဓာတ်ပုံ တင်ပြီးသည်အထိ ခဏစောင့်ပါ။',
       failed: 'ပို့၍ မရပါ။ နောက်မှ ထပ်ကြိုးစားပါ။',
       tooMany: 'ခဏစောင့်ပြီး ပြန်ကြိုးစားပါ။',
-      upload: 'ဓာတ်ပုံ တင်၍ မရပါ။ ထပ်ကြိုးစားပါ။',
     },
     thanksTitle: 'ကျေးဇူးတင်ပါတယ်!',
     thanksBody: 'အချက်အလက်များ လက်ခံရရှိပါပြီ။ Website လေး ပြီးသွားရင် QR code ကို ပြန်ပို့ပေးပါမယ် ♡',
@@ -76,14 +69,10 @@ const TEXT = {
     messagePlaceholder: 'Write what is in your heart…',
     writeForMe: 'Please write it for me',
     photos: 'Photos',
-    photosHint: 'You can add up to 3 memory photos (optional)',
-    memory: 'Memory photo',
+    photosHint: 'Please send photos in the chat.',
+    memory: 'Memory',
     memDate: 'Date',
     memCaption: 'A short caption (e.g. Our first trip together)',
-    couplePhoto: 'A photo of the two of you (optional)',
-    pick: 'Choose a photo',
-    change: 'Change',
-    uploading: 'Uploading…',
     extras: 'Want to write your own? (optional)',
     extrasNote: "If you leave these empty, we'll write sweet ones for you",
     cakeWishes: 'Wishes on the birthday cake (up to 5)',
@@ -100,12 +89,9 @@ const TEXT = {
       senderName: 'Please enter your name.',
       relationStart: 'Please choose the date you got together.',
       loveMessage: 'Please write a message, or tick "Please write it for me".',
-      photos: 'Please upload all 3 memory photos.',
       password: 'The password needs at least 6 letters or numbers.',
-      busy: 'Please wait until the photos have finished uploading.',
       failed: 'Could not send. Please try again later.',
       tooMany: 'Please wait a little and try again.',
-      upload: 'Could not upload the photo. Please try again.',
     },
     thanksTitle: 'Thank you!',
     thanksBody: "We've received your details. We'll send you the QR code once your website is ready ♡",
@@ -119,102 +105,6 @@ interface Memory {
   photo: string;
   date: string;
   caption: string;
-}
-
-// Shrinks a photo to at most 1600px and re-saves it as JPEG so it uploads quickly on mobile data.
-function compressImage(file: File, maxSide = 1600, quality = 0.85): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return reject(new Error('read'));
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob((b) => (b ? resolve(new File([b], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })) : reject(new Error('read'))), 'image/jpeg', quality);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('read'));
-    };
-    img.src = url;
-  });
-}
-
-function putFile(url: string, file: File) {
-  return new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', url);
-    xhr.setRequestHeader('x-upsert', 'false');
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) return resolve();
-      let why = '';
-      try { why = String(JSON.parse(xhr.responseText).message || ''); } catch { /* not JSON */ }
-      reject(new Error(`put ${xhr.status}${why ? ' ' + why.slice(0, 60) : ''}`));
-    };
-    xhr.onerror = () => reject(new Error('put network'));
-    // Same multipart body the Supabase client sends for a signed upload.
-    const body = new FormData();
-    body.append('cacheControl', '31536000');
-    body.append('', file);
-    xhr.send(body);
-  });
-}
-
-// One photo slot: choose a picture, it is shrunk and uploaded straight away, and its preview shows.
-function PhotoSlot({ token, value, onChange, onBusy, lang }: { token: string; value: string; onChange: (url: string) => void; onBusy: (busy: boolean) => void; lang: Lang }) {
-  const t = TEXT[lang];
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const pick = async (file: File | undefined) => {
-    if (!file) return;
-    setError('');
-    setBusy(true);
-    onBusy(true);
-    try {
-      // If the browser cannot shrink the photo, send it as it is when it is already a web format.
-      const small = await compressImage(file).catch((e) => {
-        if (['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && file.size <= 12 * 1024 * 1024) return file;
-        throw e;
-      });
-      const res = await fetch(`/api/public/request/${token}/upload-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: small.name, contentType: small.type, size: small.size }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 429) throw new Error(t.errors.tooMany);
-      if (!res.ok) throw new Error(`sign ${res.status}${data.status ? '/' + data.status : ''}`);
-      await putFile(data.uploadUrl, small);
-      onChange(data.publicUrl);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      setError(msg === t.errors.tooMany ? msg : `${t.errors.upload} (${msg || 'error'})`);
-    } finally {
-      setBusy(false);
-      onBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  };
-
-  return (
-    <div className="req-photo">
-      {value ? <img src={value} alt="" /> : <div className="req-photo-empty">📷</div>}
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
-      <button type="button" className="req-photo-btn" onClick={() => fileRef.current?.click()} disabled={busy}>
-        {busy ? t.uploading : value ? t.change : t.pick}
-      </button>
-      {error && <p className="req-error">{error}</p>}
-    </div>
-  );
 }
 
 const emptyMemory = (): Memory => ({ photo: '', date: '', caption: '' });
@@ -234,12 +124,10 @@ export default function GiftRequest() {
   const [loveMessage, setLoveMessage] = useState('');
   const [writeForMe, setWriteForMe] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([emptyMemory(), emptyMemory(), emptyMemory()]);
-  const [couplePhoto, setCouplePhoto] = useState('');
   const [cakeWishes, setCakeWishes] = useState<string[]>(['', '', '', '', '']);
   const [reasons, setReasons] = useState<string[]>(Array(12).fill(''));
   const [password, setPassword] = useState('');
   const [website, setWebsite] = useState(''); // hidden field, only bots fill it in
-  const [busyCount, setBusyCount] = useState(0);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
@@ -266,14 +154,12 @@ export default function GiftRequest() {
       .catch(() => setState('notFound'));
   }, [token]);
 
-  const setBusy = (b: boolean) => setBusyCount((n) => Math.max(0, n + (b ? 1 : -1)));
   const setMemory = (i: number, patch: Partial<Memory>) => setMemories((prev) => prev.map((m, k) => (k === i ? { ...m, ...patch } : m)));
   const setAt = (setter: React.Dispatch<React.SetStateAction<string[]>>, i: number, v: string) => setter((prev) => prev.map((x, k) => (k === i ? v : x)));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const E = t.errors;
-    if (busyCount > 0) return setError(E.busy);
     if (!occasion) return setError(E.occasion);
     if (!eventDate) return setError(E.eventDate);
     if (!receiverName.trim()) return setError(E.receiverName);
@@ -289,7 +175,7 @@ export default function GiftRequest() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           occasion, eventDate, receiverName, senderName, relationStart, loveMessage, writeForMe,
-          memories, couplePhoto, cakeWishes, reasons, password, website,
+          memories, cakeWishes, reasons, password, website,
         }),
       });
       if (res.status === 429) setError(E.tooMany);
@@ -368,13 +254,10 @@ export default function GiftRequest() {
               {memories.map((m, i) => (
                 <div className="req-memory" key={i}>
                   <span className="req-memory-title">{t.memory} {i + 1}</span>
-                  <PhotoSlot token={token} lang={lang} value={m.photo} onChange={(url) => setMemory(i, { photo: url })} onBusy={setBusy} />
                   <input type="date" className="survey-input" aria-label={t.memDate} value={m.date} onChange={(e) => setMemory(i, { date: e.target.value })} />
                   <input className="survey-input" placeholder={t.memCaption} maxLength={60} value={m.caption} onChange={(e) => setMemory(i, { caption: e.target.value })} />
                 </div>
               ))}
-              <span className="req-memory-title">{t.couplePhoto}</span>
-              <PhotoSlot token={token} lang={lang} value={couplePhoto} onChange={setCouplePhoto} onBusy={setBusy} />
             </fieldset>
 
             <fieldset className="survey-block">
@@ -397,7 +280,7 @@ export default function GiftRequest() {
             <input className="survey-trap" tabIndex={-1} autoComplete="off" aria-hidden="true" value={website} onChange={(e) => setWebsite(e.target.value)} />
 
             {error && <p className="req-error">{error}</p>}
-            <button type="submit" className="req-submit" disabled={sending || busyCount > 0}>{sending ? t.sending : busyCount > 0 ? t.uploading : t.submit}</button>
+            <button type="submit" className="req-submit" disabled={sending}>{sending ? t.sending : t.submit}</button>
           </form>
         )}
       </div>

@@ -116,9 +116,8 @@ module.exports = async (req, res, [first, second, third]) => {
 
   // The gift-website request form (public, one private link per order: /request/<token> in the admin app).
   //   GET  /api/public/request/:token             -> { status: waiting | submitted | closed }
-  //   POST /api/public/request/:token/upload-url  -> a signed upload for one photo { uploadUrl, publicUrl }
   //   POST /api/public/request/:token             -> saves the customer's answers
-  // The token is the only key, so a wrong one answers 404 and the number of uploads and answers per
+  // The token is the only key, so a wrong one answers 404 and the number of answers per
   // link is capped.
   if (first === 'request' && second) {
     const token = String(second);
@@ -132,20 +131,6 @@ module.exports = async (req, res, [first, second, third]) => {
       return res.status(200).json({ status: row.status === 'site_made' ? 'closed' : row.status });
     }
     if (req.method === 'POST' && row.status === 'site_made') return res.status(409).json({ error: 'closed' });
-
-    if (req.method === 'POST' && third === 'upload-url') {
-      const { SUPABASE_URL, BUCKET, signUpload } = require('../storage');
-      if (!SUPABASE_URL) return res.status(503).json({ error: 'uploads_unavailable' });
-      const { fileName, contentType, size } = req.body || {};
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) return res.status(400).json({ error: 'type' });
-      if (!Number.isFinite(size) || size <= 0 || size > 12 * 1024 * 1024) return res.status(400).json({ error: 'size' });
-      // 60 photo uploads per link leaves room for every photo slot plus plenty of retries.
-      const slot = await pool.query('UPDATE site_requests SET uploads = uploads + 1 WHERE id = $1 AND uploads < 60 RETURNING uploads', [row.id]);
-      if (slot.rowCount === 0) return res.status(429).json({ error: 'too_many' });
-      const signed = await signUpload(`requests/${token.slice(0, 12)}`, fileName, contentType);
-      if (signed.failed) return res.status(502).json({ error: 'upload_failed', status: signed.failed });
-      return res.status(200).json(signed);
-    }
 
     if (req.method === 'POST' && !third) {
       const body = req.body || {};
