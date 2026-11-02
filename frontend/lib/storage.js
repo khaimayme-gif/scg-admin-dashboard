@@ -7,7 +7,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const BUCKET = process.env.SUPABASE_TEMPLATE_BUCKET || 'template-videos';
 const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
-// Returns { uploadUrl, publicUrl } for a new file under `folder`, or null if Supabase refused.
+// Returns { uploadUrl, publicUrl } for a new file under `folder`, or { failed, detail } if Supabase refused.
 async function signUpload(folder, fileName, contentType) {
   const base = String(fileName || 'photo').replace(/\.[^.]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'photo';
   const path = `${folder}/${Date.now()}-${crypto.randomBytes(3).toString('hex')}-${base}.${EXT[contentType]}`;
@@ -16,8 +16,9 @@ async function signUpload(folder, fileName, contentType) {
     headers: { Authorization: `Bearer ${SUPABASE_KEY}`, apikey: SUPABASE_KEY },
   });
   if (!signed.ok) {
-    console.error('Supabase signed upload failed', signed.status, await signed.text().catch(() => ''));
-    return null;
+    const detail = await signed.text().catch(() => '');
+    console.error('Supabase signed upload failed', signed.status, detail);
+    return { failed: signed.status, detail: detail.slice(0, 200) };
   }
   const { url } = await signed.json();
   return { uploadUrl: `${SUPABASE_URL}/storage/v1${url}`, publicUrl: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}` };
