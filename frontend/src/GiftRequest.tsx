@@ -24,7 +24,7 @@ const TEXT = {
     messagePlaceholder: 'ရင်ထဲက စကားတွေကို ရေးပါ…',
     writeForMe: 'မင်မင်တို့ကို ရေးပေးစေချင်ပါတယ်',
     photos: 'ဓာတ်ပုံများ',
-    photosHint: 'အမှတ်တရ ဓာတ်ပုံ ၃ ပုံ လိုအပ်ပါတယ်',
+    photosHint: 'အမှတ်တရ ဓာတ်ပုံ ၃ ပုံအထိ တင်နိုင်ပါတယ် (မတင်လည်းရပါတယ်)',
     memory: 'အမှတ်တရ ဓာတ်ပုံ',
     memDate: 'ရက်စွဲ',
     memCaption: 'ပုံနဲ့လိုက်ဖတ်တဲ့စာလေး (ဥပမာ - ပထမဆုံး ခရီးသွားခဲ့တဲ့နေ့)',
@@ -76,7 +76,7 @@ const TEXT = {
     messagePlaceholder: 'Write what is in your heart…',
     writeForMe: 'Please write it for me',
     photos: 'Photos',
-    photosHint: 'We need 3 memory photos',
+    photosHint: 'You can add up to 3 memory photos (optional)',
     memory: 'Memory photo',
     memDate: 'Date',
     memCaption: 'A short caption (e.g. Our first trip together)',
@@ -280,7 +280,6 @@ export default function GiftRequest() {
     if (!senderName.trim()) return setError(E.senderName);
     if (!relationStart) return setError(E.relationStart);
     if (!loveMessage.trim() && !writeForMe) return setError(E.loveMessage);
-    if (memories.some((m) => !m.photo)) return setError(E.photos);
     if (password.trim() && !/^[A-Za-z0-9._-]{6,40}$/.test(password.trim())) return setError(E.password);
     setError('');
     setSending(true);

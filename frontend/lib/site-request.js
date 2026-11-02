@@ -38,7 +38,6 @@ function cleanAnswers(body) {
     date: isoDate(m && m.date) ? m.date : '',
     caption: text(m && m.caption, 60),
   }));
-  if (memories.length < 3 || memories.some((m) => !m.photo)) return { error: 'photos' };
 
   const password = text(b.password, 40).toLowerCase();
   if (password && !/^[a-z0-9._-]{6,40}$/.test(password)) return { error: 'password' };
@@ -86,7 +85,7 @@ function buildSiteValues(a, fields) {
   a.cakeWishes.forEach((t, i) => { if (t) v[`cakeWishes.${i}`] = t; });
   a.reasons.forEach((t, i) => { if (t) v[`cards.${i}.msg`] = t; });
   a.memories.forEach((m, i) => {
-    v[`memCards.${i}.photo`] = m.photo;
+    if (m.photo) v[`memCards.${i}.photo`] = m.photo;
     v[`memCards.${i}.date`] = prettyDate(m.date);
     v[`memCards.${i}.caption`] = m.caption || 'Our memory 💙';
   });
@@ -94,7 +93,7 @@ function buildSiteValues(a, fields) {
 
   // The two small round photos on the letter: the customer's own picks, else the first two memories.
   const letter = fields.filter((f) => f.type === 'image' && /Ll s2/.test(f.group));
-  letter.slice(0, 2).forEach((f, i) => { v[f.id] = a.letterPhotos[i] || a.memories[i].photo; });
+  letter.slice(0, 2).forEach((f, i) => { v[f.id] = a.letterPhotos[i] || (a.memories[i] && a.memories[i].photo); if (!v[f.id]) delete v[f.id]; });
 
   // The opening screen and the music player say "Happy Birthday"; an anniversary says so instead.
   if (a.occasion === 'anniversary') {
