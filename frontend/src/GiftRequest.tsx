@@ -154,8 +154,8 @@ function putFile(url: string, file: File) {
     xhr.setRequestHeader('Content-Type', file.type);
     xhr.setRequestHeader('x-upsert', 'false');
     xhr.setRequestHeader('cache-control', 'max-age=31536000');
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('put')));
-    xhr.onerror = () => reject(new Error('put'));
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`put ${xhr.status}`)));
+    xhr.onerror = () => reject(new Error('put network'));
     xhr.send(file);
   });
 }
@@ -173,18 +173,24 @@ function PhotoSlot({ token, value, onChange, onBusy, lang }: { token: string; va
     setBusy(true);
     onBusy(true);
     try {
-      const small = await compressImage(file);
+      // If the browser cannot shrink the photo, send it as it is when it is already a web format.
+      const small = await compressImage(file).catch((e) => {
+        if (['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && file.size <= 12 * 1024 * 1024) return file;
+        throw e;
+      });
       const res = await fetch(`/api/public/request/${token}/upload-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName: small.name, contentType: small.type, size: small.size }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(res.status === 429 ? t.errors.tooMany : t.errors.upload);
+      if (res.status === 429) throw new Error(t.errors.tooMany);
+      if (!res.ok) throw new Error(`sign ${res.status}${data.status ? '/' + data.status : ''}`);
       await putFile(data.uploadUrl, small);
       onChange(data.publicUrl);
     } catch (err) {
-      setError(err instanceof Error && err.message === t.errors.tooMany ? t.errors.tooMany : t.errors.upload);
+      const msg = err instanceof Error ? err.message : '';
+      setError(msg === t.errors.tooMany ? msg : `${t.errors.upload} (${msg || 'error'})`);
     } finally {
       setBusy(false);
       onBusy(false);

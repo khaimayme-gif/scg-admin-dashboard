@@ -139,11 +139,11 @@ module.exports = async (req, res, [first, second, third]) => {
       const { fileName, contentType, size } = req.body || {};
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) return res.status(400).json({ error: 'type' });
       if (!Number.isFinite(size) || size <= 0 || size > 12 * 1024 * 1024) return res.status(400).json({ error: 'size' });
-      // 20 photos per link is plenty for 3 memories, 2 letter photos and a couple of retries.
-      const slot = await pool.query('UPDATE site_requests SET uploads = uploads + 1 WHERE id = $1 AND uploads < 20 RETURNING uploads', [row.id]);
+      // 60 photo uploads per link leaves room for every photo slot plus plenty of retries.
+      const slot = await pool.query('UPDATE site_requests SET uploads = uploads + 1 WHERE id = $1 AND uploads < 60 RETURNING uploads', [row.id]);
       if (slot.rowCount === 0) return res.status(429).json({ error: 'too_many' });
       const signed = await signUpload(`requests/${token.slice(0, 12)}`, fileName, contentType);
-      if (!signed) return res.status(502).json({ error: 'upload_failed' });
+      if (signed.failed) return res.status(502).json({ error: 'upload_failed', status: signed.failed });
       return res.status(200).json(signed);
     }
 
